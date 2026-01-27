@@ -34,15 +34,14 @@ export default function DashboardPage() {
     setError('');
 
     try {
-      // First check if Freighter is installed
-      const { isConnected } = await freighterApi.isConnected();
+      // requestAccess will prompt the user to connect if not already connected
+      // This works even if isConnected() returns false
+      const accessResult = await freighterApi.requestAccess();
       
-      if (!isConnected) {
-        // Try to request access
-        const { isAllowed } = await freighterApi.isAllowed();
-        if (!isAllowed) {
-          await freighterApi.setAllowed();
-        }
+      if (accessResult.error) {
+        setError(accessResult.error);
+        setIsConnecting(false);
+        return;
       }
 
       const { address } = await freighterApi.getAddress();
@@ -53,7 +52,8 @@ export default function DashboardPage() {
       }
     } catch (err: any) {
       console.error('Connect failed:', err);
-      if (err?.message?.includes('Freighter is not connected')) {
+      // Check if Freighter is not installed at all
+      if (err?.message?.includes('Freighter') || err?.message?.includes('Extension')) {
         setError('Freighter wallet not found. Please install it from freighter.app');
       } else {
         setError(err instanceof Error ? err.message : 'Connection failed');
