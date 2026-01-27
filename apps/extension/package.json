@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vite build --watch --mode development",
-    "build": "vite build",
+    "dev": "node scripts/build.js --watch",
+    "build": "node scripts/build.js",
     "lint": "eslint ."
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
+    "esbuild": "^0.24.0",
     "typescript": "^5.3.3",
     "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "@stellar/freighter-api": "^6.0.1"
   }
 }
