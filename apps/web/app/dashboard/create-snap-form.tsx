@@ -77,19 +77,18 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
   };
 
   const inputClass =
-    'w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400';
+    'w-full bg-[#525152] border border-[#4e4d4f] rounded-xl px-4 py-3 text-[#e8e7e9] placeholder-[#8a898b] focus:outline-none focus:border-[#6b6a6c] focus:ring-1 focus:ring-[#6b6a6c]';
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8"
+      className="bg-[#3e3d3f] rounded-2xl shadow-sm border border-[#4e4d4f] p-6 md:p-8"
     >
-      {/* Title inside card – bold, dark, like reference */}
-      <h2 className="text-lg font-bold text-gray-900 mb-6">Create New Snap</h2>
+      <h2 className="text-lg font-bold text-[#e8e7e9] mb-6">Create New Snap</h2>
 
       {/* Title */}
       <div className="mb-6">
-        <label className="text-gray-600 text-sm font-medium mb-2 block">Title *</label>
+        <label className="text-[#b5b4b6] text-sm font-medium mb-2 block">Title *</label>
         <input
           type="text"
           value={form.title}
@@ -102,7 +101,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Description */}
       <div className="mb-6">
-        <label className="text-gray-600 text-sm font-medium mb-2 block">Description</label>
+        <label className="text-[#b5b4b6] text-sm font-medium mb-2 block">Description</label>
         <input
           type="text"
           value={form.description}
@@ -114,7 +113,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Destination */}
       <div className="mb-6">
-        <label className="text-gray-600 text-sm font-medium mb-2 block">Destination Address *</label>
+        <label className="text-[#b5b4b6] text-sm font-medium mb-2 block">Destination Address *</label>
         <input
           type="text"
           value={form.destination}
@@ -126,7 +125,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
         <button
           type="button"
           onClick={() => setForm({ ...form, destination: creator })}
-          className="text-purple-600 text-sm mt-2 hover:underline font-medium"
+          className="text-[#b5b4b6] text-sm mt-2 hover:text-[#e8e7e9] font-medium transition-colors"
         >
           Use my address
         </button>
@@ -134,7 +133,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Amount */}
       <div className="mb-6">
-        <label className="text-gray-600 text-sm font-medium mb-2 block">
+        <label className="text-[#b5b4b6] text-sm font-medium mb-2 block">
           Amount (leave empty for open amount)
         </label>
         <div className="flex gap-3">
@@ -149,7 +148,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
           <select
             value={form.assetCode}
             onChange={(e) => setForm({ ...form, assetCode: e.target.value })}
-            className="bg-gray-50 border border-gray-200 rounded-xl pl-3 pr-9 py-3 text-xs font-medium text-gray-900 focus:outline-none focus:border-purple-400 w-[6.5rem] min-w-[6.5rem]"
+            className="bg-[#525152] border border-[#4e4d4f] rounded-xl pl-3 pr-9 py-3 text-xs font-medium text-[#e8e7e9] focus:outline-none focus:border-[#6b6a6c] w-[6.5rem] min-w-[6.5rem]"
           >
             <option value="XLM">XLM</option>
             <option value="USDC">USDC</option>
@@ -159,7 +158,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Memo */}
       <div className="mb-8">
-        <label className="text-gray-600 text-sm font-medium mb-2 block">Memo</label>
+        <label className="text-[#b5b4b6] text-sm font-medium mb-2 block">Memo</label>
         <input
           type="text"
           value={form.memo}
@@ -171,26 +170,26 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl">
-          <p className="text-red-600 text-sm">{error}</p>
+        <div className="mb-6 p-4 bg-[#2a292b] border border-[#4e4d4f] rounded-xl">
+          <p className="text-[#b5b4b6] text-sm">{error}</p>
         </div>
       )}
 
       {/* Success */}
       {success && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-xl">
-          <p className="text-green-700 text-sm font-medium mb-2">Snap created!</p>
+        <div className="mb-6 p-4 bg-[#525152] border border-[#4e4d4f] rounded-xl">
+          <p className="text-[#e8e7e9] text-sm font-medium mb-2">Snap created!</p>
           <div className="flex items-center gap-3">
             <input
               type="text"
               value={success}
               readOnly
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-xs font-mono"
+              className="flex-1 bg-[#3e3d3f] border border-[#4e4d4f] rounded-lg px-3 py-2 text-[#e8e7e9] text-xs font-mono"
             />
             <button
               type="button"
               onClick={copyLink}
-              className="text-purple-600 text-sm font-medium hover:underline shrink-0"
+              className="text-[#b5b4b6] text-sm font-medium hover:text-[#e8e7e9] shrink-0 transition-colors"
             >
               Copy
             </button>
@@ -202,7 +201,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3.5 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 shadow-md"
+        className="w-full bg-[#525152] text-[#e8e7e9] font-semibold py-3.5 px-4 rounded-xl hover:bg-[#6b6a6c] transition-colors disabled:opacity-50 border border-[#4e4d4f]"
       >
         {isSubmitting ? 'Creating...' : 'Create Snap'}
       </button>
