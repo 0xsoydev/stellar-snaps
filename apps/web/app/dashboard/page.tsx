@@ -33,7 +33,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f9f7fa] px-4 pt-5 pb-12 md:px-8 md:pt-6">
+    <div className="min-h-screen bg-dashboard-dots px-4 pt-5 pb-12 md:px-8 md:pt-6">
       <div className="max-w-5xl mx-auto">
         <DashboardHeader
           address={address}
