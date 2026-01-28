@@ -25,7 +25,7 @@ export async function GET(
       
       // Extract snap ID from resolved URL
       const match = finalUrl.match(/\/s\/([a-zA-Z0-9_-]+)/);
-      if (match) {
+      if (match && match[1]) {
         snapId = match[1];
       } else {
         return NextResponse.json(
