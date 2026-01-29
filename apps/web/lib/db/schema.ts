@@ -1,4 +1,9 @@
-import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+
+// Registry status enum
+export const registryStatusEnum = pgEnum('registry_status', ['pending', 'trusted', 'unverified', 'blocked']);
+
+// ============ SNAPS TABLE ============
 
 export const snaps = pgTable('snaps', {
   id: text('id').primaryKey(),
@@ -27,3 +32,30 @@ export const snaps = pgTable('snaps', {
 
 export type Snap = typeof snaps.$inferSelect;
 export type NewSnap = typeof snaps.$inferInsert;
+
+// ============ REGISTRY TABLE ============
+
+export const registry = pgTable('registry', {
+  // Domain as primary key (e.g., 'stellar-snaps.vercel.app', 'mystore.com')
+  domain: text('domain').primaryKey(),
+  
+  // Status: pending (awaiting review), trusted, unverified, blocked
+  status: registryStatusEnum('status').default('pending').notNull(),
+  
+  // Display info
+  name: text('name'),
+  description: text('description'),
+  icon: text('icon'),
+  
+  // Contact/ownership
+  ownerWallet: text('owner_wallet'),
+  contactEmail: text('contact_email'),
+  
+  // Timestamps
+  registeredAt: timestamp('registered_at').defaultNow(),
+  verifiedAt: timestamp('verified_at'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export type RegistryEntry = typeof registry.$inferSelect;
+export type NewRegistryEntry = typeof registry.$inferInsert;

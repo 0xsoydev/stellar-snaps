@@ -1,82 +1,136 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { registry } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 /**
- * Registry of trusted domains that can serve Stellar Snaps
+ * Registry API - Database-backed domain registry
  * 
- * Similar to Dialect's Blinks registry:
- * - Extensions fetch this list to know which domains to trust
- * - Domains must be verified before being marked as "trusted"
- * - Unverified domains can still work but show warning badge
+ * Domains must be registered and verified before being marked as "trusted".
+ * The extension uses this to determine trust badges for payment cards.
+ * 
+ * Status levels:
+ * - pending: Newly registered, awaiting review
+ * - trusted: Verified and approved
+ * - unverified: Registered but not yet verified (still works, shows warning)
+ * - blocked: Explicitly blocked (won't render cards)
  */
 
-export interface RegistryEntry {
-  domain: string;
-  status: 'trusted' | 'unverified' | 'blocked';
-  name?: string;
-  description?: string;
-  icon?: string;
-  registeredAt: string;
-  verifiedAt?: string;
-}
+// CORS headers for extension access
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
+};
 
-// For now, hardcoded registry. Later: move to database
-const REGISTRY: RegistryEntry[] = [
-  {
-    domain: 'stellar-snaps.vercel.app',
-    status: 'trusted',
-    name: 'Stellar Snaps',
-    description: 'Official Stellar Snaps service',
-    registeredAt: '2025-01-01T00:00:00Z',
-    verifiedAt: '2025-01-01T00:00:00Z',
-  },
-  {
-    domain: 'localhost:3000',
-    status: 'trusted',
-    name: 'Local Development',
-    description: 'Local development server',
-    registeredAt: '2025-01-01T00:00:00Z',
-    verifiedAt: '2025-01-01T00:00:00Z',
-  },
-];
-
-// GET /api/registry - returns list of all registered domains
+// GET /api/registry - List all domains or get specific domain
 export async function GET(request: NextRequest) {
-  // Optional: filter by domain
   const domain = request.nextUrl.searchParams.get('domain');
   
-  if (domain) {
-    const entry = REGISTRY.find(e => e.domain === domain);
-    if (entry) {
-      return NextResponse.json(entry, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
-        },
-      });
+  try {
+    if (domain) {
+      // Get specific domain
+      const [entry] = await db
+        .select()
+        .from(registry)
+        .where(eq(registry.domain, domain));
+      
+      if (!entry) {
+        return NextResponse.json(
+          { error: 'Domain not found', domain },
+          { status: 404, headers: corsHeaders }
+        );
+      }
+      
+      return NextResponse.json(entry, { headers: corsHeaders });
     }
+    
+    // List all domains (excluding blocked by default)
+    const showBlocked = request.nextUrl.searchParams.get('showBlocked') === 'true';
+    
+    const entries = await db.select().from(registry);
+    
+    const filtered = showBlocked 
+      ? entries 
+      : entries.filter(e => e.status !== 'blocked');
+    
     return NextResponse.json(
-      { error: 'Domain not found', domain },
-      { status: 404 }
+      { domains: filtered },
+      { headers: corsHeaders }
+    );
+  } catch (error) {
+    console.error('Registry GET error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch registry' },
+      { status: 500, headers: corsHeaders }
     );
   }
+}
 
-  return NextResponse.json(
-    { domains: REGISTRY },
-    {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=300',
-      },
+// POST /api/registry - Register a new domain
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { domain, name, description, icon, ownerWallet, contactEmail } = body;
+    
+    if (!domain) {
+      return NextResponse.json(
+        { error: 'Domain is required' },
+        { status: 400, headers: corsHeaders }
+      );
     }
-  );
+    
+    // Normalize domain (lowercase, no protocol/trailing slash)
+    const normalizedDomain = domain
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
+    
+    // Check if already registered
+    const [existing] = await db
+      .select()
+      .from(registry)
+      .where(eq(registry.domain, normalizedDomain));
+    
+    if (existing) {
+      return NextResponse.json(
+        { error: 'Domain already registered', entry: existing },
+        { status: 409, headers: corsHeaders }
+      );
+    }
+    
+    // Insert new domain (starts as 'pending')
+    const [newEntry] = await db
+      .insert(registry)
+      .values({
+        domain: normalizedDomain,
+        name: name || normalizedDomain,
+        description,
+        icon,
+        ownerWallet,
+        contactEmail,
+        status: 'pending',
+      })
+      .returning();
+    
+    return NextResponse.json(
+      { 
+        message: 'Domain registered successfully',
+        entry: newEntry,
+        note: 'Domain is pending review. It will work but show as unverified until approved.',
+      },
+      { status: 201, headers: corsHeaders }
+    );
+  } catch (error) {
+    console.error('Registry POST error:', error);
+    return NextResponse.json(
+      { error: 'Failed to register domain' },
+      { status: 500, headers: corsHeaders }
+    );
+  }
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return new NextResponse(null, { headers: corsHeaders });
 }

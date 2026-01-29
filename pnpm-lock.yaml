@@ -48,12 +48,12 @@ importers:
       '@radix-ui/react-slot':
         specifier: ^1.2.4
         version: 1.2.4(@types/react@19.2.2)(react@19.2.0)
-      '@repo/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@stellar-snaps/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@stellar/freighter-api':
         specifier: ^6.0.1
         version: 6.0.1
