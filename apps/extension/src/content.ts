@@ -88,6 +88,11 @@ interface QuoteResponse {
   sourceAsset?: string;
   sourceTokenAddress?: string;
   bridgeAddress?: string;
+  messenger?: number;
+  
+  // Destination token info (for bridge call)
+  destTokenAddress?: string;
+  destChainId?: number;
   
   // Legacy 1Click fields
   depositAddress?: string;
@@ -1379,9 +1384,9 @@ async function executeAllbridgePayment(
       tokenAddress: quote.sourceTokenAddress,
       amount: quote.amountIn,
       recipient: quote.destinationAddress,
-      destinationChainId: 7, // SRB (Stellar) in Allbridge
-      receiveToken: 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75', // Stellar USDC pool
-      messenger: 1, // ALLBRIDGE messenger
+      destinationChainId: quote.destChainId || 7, // SRB (Stellar) in Allbridge
+      receiveToken: quote.destTokenAddress, // Stellar USDC pool address from quote
+      messenger: quote.messenger || 1, // ALLBRIDGE messenger
       gasFee: quote.gasFee || '0',
     });
 

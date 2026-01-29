@@ -162,6 +162,10 @@ export async function POST(request: NextRequest) {
       bridgeAddress: quote.bridgeAddress,
       messenger: quote.messenger,
       
+      // Destination token info (needed for bridge call)
+      destTokenAddress: quote.destToken.tokenAddress,
+      destChainId: 7, // SRB in Allbridge
+      
       // Amounts
       amountIn: quote.amountIn,
       amountInFormatted: quote.amountInFormatted,

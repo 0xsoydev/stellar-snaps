@@ -355,44 +355,64 @@ async function checkAllowance(tokenAddress: string, owner: string, spender: stri
 
 interface BridgeTransactionParams {
   bridgeAddress: string;
-  tokenAddress: string;
-  amount: string;
-  recipient: string; // Stellar address as bytes32
-  destinationChainId: number;
-  receiveToken: string; // Destination token address
-  messenger: number;
-  gasFee: string;
+  tokenAddress: string;      // Source token address (EVM, 0x...)
+  amount: string;            // Amount in base units
+  recipient: string;         // Stellar address (G...)
+  destinationChainId: number; // Allbridge chain ID (7 for Stellar)
+  receiveToken: string;      // Destination token address on Stellar
+  messenger: number;         // 1 = Allbridge, 2 = Wormhole
+  gasFee: string;            // Gas fee in wei (native currency)
 }
 
+/**
+ * Send a bridge transaction via Allbridge Core
+ * 
+ * Contract function: swapAndBridge(bytes32 token, uint256 amount, bytes32 recipient, 
+ *   uint256 destinationChainId, bytes32 receiveToken, uint256 nonce, uint8 messenger, uint256 feeTokenAmount)
+ */
 async function sendBridgeTransaction(params: BridgeTransactionParams): Promise<string> {
   const ethereum = (window as any).ethereum;
   if (!ethereum) throw new Error('No EVM wallet detected');
 
   const from = await getEVMAddress();
 
-  // Allbridge Core swapAndBridge function
-  // swapAndBridge(bytes32,uint256,uint8,bytes32,uint8,bytes32,uint256)
-  // For simplicity, we encode the call data manually
+  // Allbridge Core swapAndBridge function selector
+  // keccak256("swapAndBridge(bytes32,uint256,bytes32,uint256,bytes32,uint256,uint8,uint256)")
+  const fnSig = '0x6372a670';
   
-  // Function signature for swapAndBridge
-  const fnSig = '0x318abc06'; // This is Allbridge's specific function
+  // Convert addresses to bytes32 format
+  const tokenBytes32 = evmAddressToBytes32(params.tokenAddress);
+  const recipientBytes32 = stellarAddressToBytes32(params.recipient);
+  const receiveTokenBytes32 = stellarTokenToBytes32(params.receiveToken);
   
-  // Encode parameters
-  // Note: Stellar addresses are 56 chars, we need to convert to bytes32
-  const recipientBytes = stellarAddressToBytes32(params.recipient);
+  // Generate random nonce (32 bytes as uint256)
+  const nonce = generateNonce();
   
-  // Build the calldata
-  // This is a simplified version - Allbridge's actual contract may have different params
-  const paddedToken = params.tokenAddress.slice(2).padStart(64, '0');
+  // Encode all parameters (each padded to 32 bytes)
+  const paddedToken = tokenBytes32;
   const paddedAmount = BigInt(params.amount).toString(16).padStart(64, '0');
+  const paddedRecipient = recipientBytes32;
   const paddedDestChain = params.destinationChainId.toString(16).padStart(64, '0');
-  const paddedRecipient = recipientBytes.padStart(64, '0');
+  const paddedReceiveToken = receiveTokenBytes32;
+  const paddedNonce = nonce;
   const paddedMessenger = params.messenger.toString(16).padStart(64, '0');
+  const paddedFeeTokenAmount = '0'.padStart(64, '0'); // 0 when paying with native
   
-  const data = fnSig + paddedToken + paddedAmount + paddedDestChain + paddedRecipient + paddedMessenger;
+  const data = fnSig + paddedToken + paddedAmount + paddedRecipient + 
+               paddedDestChain + paddedReceiveToken + paddedNonce + 
+               paddedMessenger + paddedFeeTokenAmount;
 
   // The bridge requires gas fee to be sent with the transaction
   const value = '0x' + BigInt(params.gasFee).toString(16);
+
+  console.log('[Stellar Snaps] Bridge transaction params:', {
+    from,
+    to: params.bridgeAddress,
+    value,
+    tokenBytes32,
+    recipientBytes32,
+    receiveTokenBytes32,
+  });
 
   const txHash = await ethereum.request({
     method: 'eth_sendTransaction',
@@ -407,20 +427,90 @@ async function sendBridgeTransaction(params: BridgeTransactionParams): Promise<s
   return txHash;
 }
 
-// Convert Stellar address (G...) to bytes32 for bridge contract
+/**
+ * Convert EVM address (0x...) to bytes32
+ * Pads with leading zeros to make 32 bytes
+ */
+function evmAddressToBytes32(address: string): string {
+  // Remove 0x prefix and pad to 64 hex chars (32 bytes)
+  const hex = address.replace(/^0x/i, '').toLowerCase();
+  return hex.padStart(64, '0');
+}
+
+/**
+ * Convert Stellar address (G...) to bytes32 for bridge contract
+ * Uses base32 decoding to extract the 32-byte public key
+ */
 function stellarAddressToBytes32(stellarAddress: string): string {
-  // Stellar addresses are base32 encoded public keys
-  // For the bridge, we typically just use a hash or direct encoding
-  // This is a simplified version - actual implementation depends on bridge contract
+  // Stellar addresses are base32 encoded with a version byte prefix and checksum
+  // Format: [version byte (1)] + [public key (32)] + [checksum (2)]
+  // We need to decode and extract the 32-byte public key
   
-  // For now, we pad the address string as hex
-  // In production, you'd use proper Stellar SDK to decode the address
-  const bytes = new TextEncoder().encode(stellarAddress);
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  
+  // Remove any whitespace
+  const address = stellarAddress.trim().toUpperCase();
+  
+  // Decode base32
+  const decoded: number[] = [];
+  let buffer = 0;
+  let bitsLeft = 0;
+  
+  for (const char of address) {
+    const value = ALPHABET.indexOf(char);
+    if (value === -1) continue;
+    
+    buffer = (buffer << 5) | value;
+    bitsLeft += 5;
+    
+    while (bitsLeft >= 8) {
+      bitsLeft -= 8;
+      decoded.push((buffer >> bitsLeft) & 0xff);
+    }
+  }
+  
+  // Skip version byte (first byte) and checksum (last 2 bytes)
+  // Extract the 32-byte public key
+  const publicKey = decoded.slice(1, 33);
+  
+  // Convert to hex
+  let hex = '';
+  for (const byte of publicKey) {
+    hex += byte.toString(16).padStart(2, '0');
+  }
+  
+  return hex.padStart(64, '0');
+}
+
+/**
+ * Convert Stellar token address to bytes32
+ * Stellar tokens use contract addresses (C...) which are also base32 encoded
+ */
+function stellarTokenToBytes32(tokenAddress: string): string {
+  // For Stellar/Soroban tokens, the address format is similar
+  // If it's a G... address (for classic assets), use same decoding
+  // If it's a C... address (contract), use same base32 decoding
+  
+  if (tokenAddress.startsWith('G') || tokenAddress.startsWith('C')) {
+    return stellarAddressToBytes32(tokenAddress);
+  }
+  
+  // If it's already hex, just pad it
+  const hex = tokenAddress.replace(/^0x/i, '');
+  return hex.padStart(64, '0');
+}
+
+/**
+ * Generate a random 32-byte nonce as hex string (64 chars)
+ */
+function generateNonce(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
   let hex = '';
   for (const byte of bytes) {
     hex += byte.toString(16).padStart(2, '0');
   }
-  return hex.slice(0, 64).padEnd(64, '0');
+  return hex;
 }
 
 // ============ SOLANA WALLET FUNCTIONS ============
