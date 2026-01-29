@@ -89,14 +89,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build 1Click quote request
+    // Build 1Click quote request with NEW schema
+    const deadline = new Date(Date.now() + 30 * 60 * 1000); // 30 min from now
+    
     const quotePayload = {
-      assetIn: sourceAssetInfo.assetId,
-      assetOut: getStellarAssetId(stellarAssetCode),
-      amountOut,
-      recipient: snap.destination,
-      refundTo: refundAddress,
       dry,
+      swapType: 'EXACT_OUTPUT',
+      slippageTolerance: 100, // 1%
+      originAsset: sourceAssetInfo.assetId,
+      depositType: 'ORIGIN_CHAIN',
+      destinationAsset: getStellarAssetId(stellarAssetCode),
+      amount: amountOut,
+      refundTo: refundAddress,
+      refundType: 'ORIGIN_CHAIN',
+      recipient: snap.destination,
+      recipientType: 'DESTINATION_CHAIN',
+      deadline: deadline.toISOString(),
     };
 
     // Call 1Click API
@@ -106,6 +114,8 @@ export async function POST(request: NextRequest) {
     if (NEAR_INTENTS_API_KEY) {
       headers['Authorization'] = `Bearer ${NEAR_INTENTS_API_KEY}`;
     }
+
+    console.log('[Intent Quote] Calling 1Click with:', JSON.stringify(quotePayload, null, 2));
 
     const quoteResponse = await fetch(`${ONECLICK_API_URL}/v0/quote`, {
       method: 'POST',
@@ -122,7 +132,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const quote = await quoteResponse.json();
+    const quoteData = await quoteResponse.json();
+    const quote = quoteData.quote;
 
     // If dry run, just return the quote preview
     if (dry) {
@@ -132,8 +143,7 @@ export async function POST(request: NextRequest) {
         amountInFormatted: quote.amountInFormatted,
         amountOut: quote.amountOut,
         amountOutFormatted: quote.amountOutFormatted,
-        feeFormatted: quote.feeFormatted,
-        estimatedTime: quote.estimatedTime || 60,
+        timeEstimate: quote.timeEstimate || 60,
         sourceChain,
         sourceAsset,
         destinationAsset: stellarAssetCode,
@@ -142,9 +152,9 @@ export async function POST(request: NextRequest) {
 
     // Create intent record
     const intentId = generateIntentId();
-    const expiresAt = quote.expiresAt 
-      ? new Date(quote.expiresAt) 
-      : new Date(Date.now() + 30 * 60 * 1000); // 30 min default
+    const expiresAt = quote.deadline 
+      ? new Date(quote.deadline) 
+      : deadline;
 
     await db.insert(intents).values({
       id: intentId,
@@ -173,11 +183,11 @@ export async function POST(request: NextRequest) {
       amountInFormatted: quote.amountInFormatted,
       amountOut: quote.amountOut,
       amountOutFormatted: quote.amountOutFormatted,
-      feeFormatted: quote.feeFormatted,
       expiresAt: expiresAt.toISOString(),
-      estimatedTime: quote.estimatedTime || 60,
+      estimatedTime: quote.timeEstimate || 60,
       sourceChain,
       sourceAsset,
+      sourceAssetId: sourceAssetInfo.assetId,
       destinationAsset: stellarAssetCode,
       destinationAddress: snap.destination,
     }, { headers: corsHeaders });
