@@ -57,8 +57,27 @@ let registryCache: Map<string, RegistryEntry> = new Map();
 let discoveryCache: Map<string, DiscoveryFile> = new Map();
 const resolveCache: Map<string, { url: string; domain: string }> = new Map();
 const processedLinks: WeakSet<Element> = new WeakSet();
-const renderedSnaps: Set<string> = new Set();
 const pendingUrls: Set<string> = new Set();
+
+// Track rendered cards by snap ID -> card element (so we can check if still in DOM)
+const renderedCards: Map<string, WeakRef<Element>> = new Map();
+
+function isSnapRendered(snapId: string): boolean {
+  const ref = renderedCards.get(snapId);
+  if (!ref) return false;
+  
+  const card = ref.deref();
+  // Card was garbage collected or removed from DOM
+  if (!card || !document.contains(card)) {
+    renderedCards.delete(snapId);
+    return false;
+  }
+  return true;
+}
+
+function markSnapRendered(snapId: string, card: Element) {
+  renderedCards.set(snapId, new WeakRef(card));
+}
 
 // Freighter bridge
 const pendingRequests = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
@@ -97,7 +116,7 @@ function init() {
   const checkNavigation = () => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
-      renderedSnaps.clear();
+      // Don't clear renderedCards - we check DOM presence instead
       scheduleScan();
     }
   };
@@ -290,7 +309,7 @@ async function processLink(linkElement: HTMLAnchorElement, href: string) {
     
     // Extract snap ID from path for dedup
     const snapId = parsedUrl.pathname.split('/').pop() || '';
-    if (renderedSnaps.has(snapId)) return;
+    if (isSnapRendered(snapId)) return;
     
     console.log('[Stellar Snaps] Fetching metadata:', metadataUrl);
     const metadataResponse = await fetch(metadataUrl);
@@ -299,15 +318,13 @@ async function processLink(linkElement: HTMLAnchorElement, href: string) {
     const metadata: SnapMetadata = await metadataResponse.json();
     
     // Double-check dedup after async
-    if (renderedSnaps.has(metadata.id)) return;
-    if (document.querySelector(`.stellar-snap-card[data-snap-id="${metadata.id}"]`)) {
-      renderedSnaps.add(metadata.id);
-      return;
-    }
+    if (isSnapRendered(metadata.id)) return;
     
     // Step 6: Render card with trust badge
-    renderCard(linkElement, metadata, finalUrl, registryEntry);
-    renderedSnaps.add(metadata.id);
+    const card = renderCard(linkElement, metadata, finalUrl, registryEntry);
+    if (card) {
+      markSnapRendered(metadata.id, card);
+    }
     
   } catch (err) {
     console.error('[Stellar Snaps] Error processing link:', href, err);
@@ -362,9 +379,9 @@ function renderCard(
   metadata: SnapMetadata,
   originalHref: string,
   registryEntry: RegistryEntry
-) {
+): HTMLElement | null {
   // Final safety check
-  if (document.querySelector(`.stellar-snap-card[data-snap-id="${metadata.id}"]`)) return;
+  if (document.querySelector(`.stellar-snap-card[data-snap-id="${metadata.id}"]`)) return null;
 
   const card = document.createElement('div');
   card.className = 'stellar-snap-card';
@@ -401,8 +418,32 @@ function renderCard(
     <div class="snap-status"></div>
   `;
 
-  linkElement.parentNode?.insertBefore(card, linkElement.nextSibling);
+  // Find the best insertion point and hide Twitter's native card
+  let insertionTarget = linkElement;
+  
+  // On X/Twitter, find and hide the native card wrapper
+  const tweet = linkElement.closest('article[data-testid="tweet"]');
+  if (tweet) {
+    const twitterCard = tweet.querySelector('[data-testid="card.wrapper"]');
+    if (twitterCard) {
+      // Hide Twitter's card and insert our card in its place
+      (twitterCard as HTMLElement).style.display = 'none';
+      twitterCard.parentNode?.insertBefore(card, twitterCard);
+      setupPayButton(card, metadata, originalHref, network);
+      return card;
+    }
+    
+    // Fallback: insert after tweet text
+    const tweetText = tweet.querySelector('[data-testid="tweetText"]');
+    if (tweetText) {
+      insertionTarget = tweetText as HTMLElement;
+    }
+  }
+
+  insertionTarget.parentNode?.insertBefore(card, insertionTarget.nextSibling);
   setupPayButton(card, metadata, originalHref, network);
+  
+  return card;
 }
 
 // ============ PAYMENT HANDLING ============
