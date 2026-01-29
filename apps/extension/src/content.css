@@ -923,3 +923,26 @@ article .stellar-snap-card {
   width: 28px;
   text-align: center;
 }
+
+/* Provider badge (Allbridge) */
+.snap-provider-badge {
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  color: #64748b;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Cross-chain badge */
+.snap-crosschain-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  margin-left: 4px;
+}

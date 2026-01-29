@@ -3,41 +3,53 @@ import { db } from '../../../../lib/db';
 import { intents, snaps } from '../../../../lib/db/schema';
 import { eq } from 'drizzle-orm';
 import {
-  ONECLICK_API_URL,
+  getQuote as getAllbridgeQuote,
+  getTokenInfo,
   SUPPORTED_CHAINS,
-  STELLAR_DECIMALS,
-  getStellarAssetId,
-  getSourceAsset,
-  generateIntentId,
-  toBaseUnits,
-  type ChainId,
-} from '../../../../lib/intents';
-
-const NEAR_INTENTS_API_KEY = process.env.NEAR_INTENTS_API_KEY;
+  parseAmount,
+  type SupportedChainId,
+} from '../../../../lib/allbridge';
 
 interface QuoteRequestBody {
   snapId: string;
-  sourceChain: ChainId;
-  sourceAsset: string; // "ETH", "USDC", etc.
+  sourceChain: SupportedChainId;
   refundAddress: string;
   dry?: boolean;
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 /**
  * POST /api/intent/quote
  * 
- * Get a quote for cross-chain payment to a snap
- * Creates an intent record and returns deposit instructions
+ * Get a quote for cross-chain payment to a snap using Allbridge Core
+ * 
+ * Allbridge supports USDC-to-USDC transfers:
+ * - Base USDC -> Stellar USDC
+ * - Ethereum USDC -> Stellar USDC
+ * - etc.
  */
 export async function POST(request: NextRequest) {
   try {
     const body: QuoteRequestBody = await request.json();
-    const { snapId, sourceChain, sourceAsset, refundAddress, dry = false } = body;
+    const { snapId, sourceChain, refundAddress, dry = false } = body;
 
     // Validate required fields
-    if (!snapId || !sourceChain || !sourceAsset || !refundAddress) {
+    if (!snapId || !sourceChain || !refundAddress) {
       return NextResponse.json(
-        { error: 'Missing required fields: snapId, sourceChain, sourceAsset, refundAddress' },
+        { error: 'Missing required fields: snapId, sourceChain, refundAddress' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Validate source chain
+    if (!(sourceChain in SUPPORTED_CHAINS)) {
+      return NextResponse.json(
+        { error: `Unsupported chain: ${sourceChain}. Supported: ${Object.keys(SUPPORTED_CHAINS).join(', ')}` },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -59,115 +71,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate source chain and asset
-    const chain = SUPPORTED_CHAINS[sourceChain];
-    if (!chain) {
+    // For cross-chain, we only support USDC snaps
+    // If the snap is for XLM, we can't do cross-chain (Allbridge only supports stablecoins)
+    if (snap.assetCode !== 'USDC') {
       return NextResponse.json(
-        { error: `Unsupported chain: ${sourceChain}` },
+        { error: 'Cross-chain payments only available for USDC snaps. Allbridge Core only supports stablecoin bridges.' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    const sourceAssetInfo = getSourceAsset(sourceChain, sourceAsset);
-    if (!sourceAssetInfo) {
-      return NextResponse.json(
-        { error: `Unsupported asset ${sourceAsset} on ${sourceChain}` },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    // Calculate amount out in Stellar base units (7 decimals)
-    const stellarAssetCode = snap.assetCode || 'XLM';
-    const amountOut = snap.amount 
-      ? toBaseUnits(snap.amount, STELLAR_DECIMALS)
-      : null;
-
-    if (!amountOut) {
+    if (!snap.amount) {
       return NextResponse.json(
         { error: 'Snap must have a fixed amount for cross-chain payments' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Build 1Click quote request with NEW schema
-    const deadline = new Date(Date.now() + 30 * 60 * 1000); // 30 min from now
-    
-    const quotePayload = {
-      dry,
-      swapType: 'EXACT_OUTPUT',
-      slippageTolerance: 100, // 1%
-      originAsset: sourceAssetInfo.assetId,
-      depositType: 'ORIGIN_CHAIN',
-      destinationAsset: getStellarAssetId(stellarAssetCode),
-      amount: amountOut,
-      refundTo: refundAddress,
-      refundType: 'ORIGIN_CHAIN',
-      recipient: snap.destination,
-      recipientType: 'DESTINATION_CHAIN',
-      deadline: deadline.toISOString(),
-    };
+    // Convert snap amount to Stellar USDC base units (7 decimals)
+    const stellarDecimals = 7;
+    const amountOutStellar = parseAmount(snap.amount, stellarDecimals);
 
-    // Call 1Click API
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (NEAR_INTENTS_API_KEY) {
-      headers['Authorization'] = `Bearer ${NEAR_INTENTS_API_KEY}`;
-    }
-
-    console.log('[Intent Quote] Calling 1Click with:', JSON.stringify(quotePayload, null, 2));
-
-    const quoteResponse = await fetch(`${ONECLICK_API_URL}/v0/quote`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(quotePayload),
+    console.log('[Intent Quote] Getting Allbridge quote:', {
+      sourceChain,
+      amountOut: amountOutStellar,
+      destination: snap.destination,
     });
 
-    if (!quoteResponse.ok) {
-      const errorText = await quoteResponse.text();
-      console.error('[Intent Quote] 1Click error:', quoteResponse.status, errorText);
-      return NextResponse.json(
-        { error: 'Failed to get quote from solver network', details: errorText },
-        { status: 502, headers: corsHeaders }
-      );
-    }
-
-    const quoteData = await quoteResponse.json();
-    const quote = quoteData.quote;
+    // Get quote from Allbridge
+    const quote = await getAllbridgeQuote(sourceChain, amountOutStellar, snap.destination);
 
     // If dry run, just return the quote preview
     if (dry) {
       return NextResponse.json({
         dry: true,
+        provider: 'allbridge',
+        sourceChain,
+        sourceAsset: 'USDC',
+        destinationAsset: 'USDC',
         amountIn: quote.amountIn,
         amountInFormatted: quote.amountInFormatted,
         amountOut: quote.amountOut,
         amountOutFormatted: quote.amountOutFormatted,
-        timeEstimate: quote.timeEstimate || 60,
-        sourceChain,
-        sourceAsset,
-        destinationAsset: stellarAssetCode,
+        bridgeFee: quote.bridgeFee,
+        bridgeFeeUsd: quote.bridgeFeeUsd,
+        gasFee: quote.gasFee,
+        gasFeeNative: quote.gasFeeNative,
+        estimatedTime: Math.ceil(quote.estimatedTime / 1000), // Convert to seconds
       }, { headers: corsHeaders });
     }
 
-    // Create intent record
+    // Create intent record for tracking
     const intentId = generateIntentId();
-    const expiresAt = quote.deadline 
-      ? new Date(quote.deadline) 
-      : deadline;
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
 
     await db.insert(intents).values({
       id: intentId,
       snapId: snap.id,
-      depositAddress: quote.depositAddress,
-      depositMemo: quote.depositMemo,
+      // For Allbridge, no deposit address - user sends directly to bridge
+      depositAddress: quote.bridgeAddress,
+      depositMemo: null,
       sourceChain,
-      sourceAsset,
-      sourceAssetId: sourceAssetInfo.assetId,
+      sourceAsset: 'USDC',
+      sourceAssetId: quote.sourceToken.tokenAddress,
       amountIn: quote.amountIn,
       amountInFormatted: quote.amountInFormatted,
       destinationAddress: snap.destination,
-      destinationAsset: stellarAssetCode,
+      destinationAsset: 'USDC',
       amountOut: quote.amountOut,
       amountOutFormatted: quote.amountOutFormatted,
       refundAddress,
@@ -175,38 +144,59 @@ export async function POST(request: NextRequest) {
       quoteExpiresAt: expiresAt,
     });
 
+    // Get chain info for frontend
+    const chainInfo = SUPPORTED_CHAINS[sourceChain];
+
     return NextResponse.json({
       intentId,
-      depositAddress: quote.depositAddress,
-      depositMemo: quote.depositMemo,
+      provider: 'allbridge',
+      
+      // Source chain info
+      sourceChain,
+      sourceChainName: chainInfo.name,
+      sourceChainEvmId: chainInfo.evmChainId,
+      sourceAsset: 'USDC',
+      sourceTokenAddress: quote.sourceToken.tokenAddress,
+      
+      // Bridge info
+      bridgeAddress: quote.bridgeAddress,
+      messenger: quote.messenger,
+      
+      // Amounts
       amountIn: quote.amountIn,
       amountInFormatted: quote.amountInFormatted,
       amountOut: quote.amountOut,
       amountOutFormatted: quote.amountOutFormatted,
-      expiresAt: expiresAt.toISOString(),
-      estimatedTime: quote.timeEstimate || 60,
-      sourceChain,
-      sourceAsset,
-      sourceAssetId: sourceAssetInfo.assetId,
-      destinationAsset: stellarAssetCode,
+      
+      // Fees
+      bridgeFee: quote.bridgeFee,
+      bridgeFeeUsd: quote.bridgeFeeUsd,
+      gasFee: quote.gasFee,
+      gasFeeNative: quote.gasFeeNative,
+      
+      // Destination
+      destinationAsset: 'USDC',
       destinationAddress: snap.destination,
+      
+      // Timing
+      expiresAt: expiresAt.toISOString(),
+      estimatedTime: Math.ceil(quote.estimatedTime / 1000),
+      
     }, { headers: corsHeaders });
 
   } catch (error) {
     console.error('[Intent Quote] Error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: String(error) },
       { status: 500, headers: corsHeaders }
     );
   }
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
 export async function OPTIONS() {
   return new NextResponse(null, { headers: corsHeaders });
+}
+
+function generateIntentId(): string {
+  return `int_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 10)}`;
 }

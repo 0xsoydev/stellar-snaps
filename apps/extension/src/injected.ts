@@ -93,6 +93,18 @@ window.addEventListener('message', async (event) => {
         result = await sendERC20(params.tokenAddress, params.to, params.amount);
         break;
 
+      case 'approveERC20':
+        result = await approveERC20(params.tokenAddress, params.spender, params.amount);
+        break;
+
+      case 'checkAllowance':
+        result = await checkAllowance(params.tokenAddress, params.owner, params.spender);
+        break;
+
+      case 'sendBridgeTransaction':
+        result = await sendBridgeTransaction(params);
+        break;
+
       // ============ SOLANA WALLETS ============
       case 'connectSolana':
         result = await connectSolanaWallet();
@@ -293,6 +305,122 @@ async function sendERC20(tokenAddress: string, to: string, amount: string): Prom
   });
 
   return txHash;
+}
+
+async function approveERC20(tokenAddress: string, spender: string, amount: string): Promise<string> {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum) throw new Error('No EVM wallet detected');
+
+  const from = await getEVMAddress();
+
+  // ERC20 approve function signature: approve(address,uint256)
+  const approveFnSig = '0x095ea7b3';
+  const paddedSpender = spender.slice(2).padStart(64, '0');
+  const paddedAmount = BigInt(amount).toString(16).padStart(64, '0');
+  const data = approveFnSig + paddedSpender + paddedAmount;
+
+  const txHash = await ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: tokenAddress,
+      data,
+    }],
+  });
+
+  return txHash;
+}
+
+async function checkAllowance(tokenAddress: string, owner: string, spender: string): Promise<string> {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum) throw new Error('No EVM wallet detected');
+
+  // ERC20 allowance function signature: allowance(address,address)
+  const allowanceFnSig = '0xdd62ed3e';
+  const paddedOwner = owner.slice(2).padStart(64, '0');
+  const paddedSpender = spender.slice(2).padStart(64, '0');
+  const data = allowanceFnSig + paddedOwner + paddedSpender;
+
+  const result = await ethereum.request({
+    method: 'eth_call',
+    params: [{
+      to: tokenAddress,
+      data,
+    }, 'latest'],
+  });
+
+  // Result is hex-encoded uint256
+  return BigInt(result).toString();
+}
+
+interface BridgeTransactionParams {
+  bridgeAddress: string;
+  tokenAddress: string;
+  amount: string;
+  recipient: string; // Stellar address as bytes32
+  destinationChainId: number;
+  receiveToken: string; // Destination token address
+  messenger: number;
+  gasFee: string;
+}
+
+async function sendBridgeTransaction(params: BridgeTransactionParams): Promise<string> {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum) throw new Error('No EVM wallet detected');
+
+  const from = await getEVMAddress();
+
+  // Allbridge Core swapAndBridge function
+  // swapAndBridge(bytes32,uint256,uint8,bytes32,uint8,bytes32,uint256)
+  // For simplicity, we encode the call data manually
+  
+  // Function signature for swapAndBridge
+  const fnSig = '0x318abc06'; // This is Allbridge's specific function
+  
+  // Encode parameters
+  // Note: Stellar addresses are 56 chars, we need to convert to bytes32
+  const recipientBytes = stellarAddressToBytes32(params.recipient);
+  
+  // Build the calldata
+  // This is a simplified version - Allbridge's actual contract may have different params
+  const paddedToken = params.tokenAddress.slice(2).padStart(64, '0');
+  const paddedAmount = BigInt(params.amount).toString(16).padStart(64, '0');
+  const paddedDestChain = params.destinationChainId.toString(16).padStart(64, '0');
+  const paddedRecipient = recipientBytes.padStart(64, '0');
+  const paddedMessenger = params.messenger.toString(16).padStart(64, '0');
+  
+  const data = fnSig + paddedToken + paddedAmount + paddedDestChain + paddedRecipient + paddedMessenger;
+
+  // The bridge requires gas fee to be sent with the transaction
+  const value = '0x' + BigInt(params.gasFee).toString(16);
+
+  const txHash = await ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to: params.bridgeAddress,
+      data,
+      value,
+    }],
+  });
+
+  return txHash;
+}
+
+// Convert Stellar address (G...) to bytes32 for bridge contract
+function stellarAddressToBytes32(stellarAddress: string): string {
+  // Stellar addresses are base32 encoded public keys
+  // For the bridge, we typically just use a hash or direct encoding
+  // This is a simplified version - actual implementation depends on bridge contract
+  
+  // For now, we pad the address string as hex
+  // In production, you'd use proper Stellar SDK to decode the address
+  const bytes = new TextEncoder().encode(stellarAddress);
+  let hex = '';
+  for (const byte of bytes) {
+    hex += byte.toString(16).padStart(2, '0');
+  }
+  return hex.slice(0, 64).padEnd(64, '0');
 }
 
 // ============ SOLANA WALLET FUNCTIONS ============

@@ -79,16 +79,45 @@ interface AvailableWallets {
 }
 
 interface QuoteResponse {
-  depositAddress: string;
+  // For Allbridge
+  provider?: 'allbridge';
+  intentId?: string;
+  sourceChain: string;
+  sourceChainName?: string;
+  sourceChainEvmId?: number;
+  sourceAsset?: string;
+  sourceTokenAddress?: string;
+  bridgeAddress?: string;
+  
+  // Legacy 1Click fields
+  depositAddress?: string;
   depositMemo?: string;
+  
+  // Amounts
   amountIn: string;
   amountInFormatted: string;
   amountOut: string;
   amountOutFormatted: string;
+  
+  // Fees (Allbridge)
+  bridgeFee?: string;
+  bridgeFeeUsd?: string;
+  gasFee?: string;
+  gasFeeNative?: string;
+  
+  // Legacy
   feeFormatted?: string;
+  
+  // Timing
   expiresAt: string;
   estimatedTime: number;
-  sourceAssetId: string;
+  
+  // Destination
+  destinationAddress?: string;
+  destinationAsset?: string;
+  
+  // Legacy
+  sourceAssetId?: string;
 }
 
 interface IntentStatusResponse {
@@ -1012,12 +1041,39 @@ function showQuoteModal(
     const expiresIn = Math.max(0, Math.floor((new Date(quote.expiresAt).getTime() - Date.now()) / 1000));
     const expiresMinutes = Math.floor(expiresIn / 60);
     
+    // Build fee display - Allbridge provides more detail
+    let feeHtml = '';
+    if (quote.provider === 'allbridge') {
+      feeHtml = `
+        <div class="snap-quote-row">
+          <span class="snap-quote-label">Bridge Fee</span>
+          <span class="snap-quote-value">~$${quote.bridgeFeeUsd || '0.00'}</span>
+        </div>
+        <div class="snap-quote-row">
+          <span class="snap-quote-label">Gas Fee</span>
+          <span class="snap-quote-value">${quote.gasFeeNative || 'Included'}</span>
+        </div>
+      `;
+    } else if (quote.feeFormatted) {
+      feeHtml = `
+        <div class="snap-quote-row">
+          <span class="snap-quote-label">Fee</span>
+          <span class="snap-quote-value">${quote.feeFormatted}</span>
+        </div>
+      `;
+    }
+
+    const providerBadge = quote.provider === 'allbridge' 
+      ? '<span class="snap-provider-badge">Powered by Allbridge Core</span>'
+      : '';
+    
     overlay.innerHTML = `
       <div class="snap-modal">
         <div class="snap-modal-header">
           <span class="snap-modal-title">Confirm Quote</span>
           <button class="snap-modal-close">&times;</button>
         </div>
+        ${providerBadge}
         <div class="snap-quote-box">
           <div class="snap-quote-row">
             <span class="snap-quote-label">You Send</span>
@@ -1031,12 +1087,7 @@ function showQuoteModal(
             <span class="snap-quote-label">Merchant Receives</span>
             <span class="snap-quote-value">${quote.amountOutFormatted} ${destAsset}</span>
           </div>
-          ${quote.feeFormatted ? `
-          <div class="snap-quote-row">
-            <span class="snap-quote-label">Fee</span>
-            <span class="snap-quote-value">${quote.feeFormatted}</span>
-          </div>
-          ` : ''}
+          ${feeHtml}
         </div>
         <div class="snap-quote-rate">
           Est. arrival: ~${Math.ceil(quote.estimatedTime / 60)} min
@@ -1283,8 +1334,78 @@ async function fetchQuote(
   }
 }
 
+async function executeAllbridgePayment(
+  quote: QuoteResponse,
+  sourceChain: ChainId
+): Promise<{ success: boolean; txHash?: string }> {
+  try {
+    if (!quote.sourceTokenAddress || !quote.bridgeAddress) {
+      throw new Error('Missing bridge information');
+    }
+
+    // 1. Check current allowance
+    const userAddress = await callFreighter('getEVMAddress');
+    const currentAllowance = await callFreighter('checkAllowance', {
+      tokenAddress: quote.sourceTokenAddress,
+      owner: userAddress,
+      spender: quote.bridgeAddress,
+    });
+
+    const requiredAmount = BigInt(quote.amountIn);
+
+    // 2. Approve if needed
+    if (BigInt(currentAllowance) < requiredAmount) {
+      showNotification('Approving USDC for bridge...', 'info');
+      
+      // Approve max uint256 for convenience (user can revoke later)
+      const maxApproval = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+      
+      await callFreighter('approveERC20', {
+        tokenAddress: quote.sourceTokenAddress,
+        spender: quote.bridgeAddress,
+        amount: maxApproval,
+      });
+      
+      // Wait a bit for the tx to be mined
+      showNotification('Waiting for approval confirmation...', 'info');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+
+    // 3. Execute bridge transaction
+    showNotification('Sending bridge transaction...', 'info');
+    
+    const txHash = await callFreighter('sendBridgeTransaction', {
+      bridgeAddress: quote.bridgeAddress,
+      tokenAddress: quote.sourceTokenAddress,
+      amount: quote.amountIn,
+      recipient: quote.destinationAddress,
+      destinationChainId: 7, // SRB (Stellar) in Allbridge
+      receiveToken: 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75', // Stellar USDC pool
+      messenger: 1, // ALLBRIDGE messenger
+      gasFee: quote.gasFee || '0',
+    });
+
+    // 4. Update backend with tx hash
+    if (quote.intentId) {
+      await fetch(`${INTENTS_API_BASE}/api/intent/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          intentId: quote.intentId,
+          depositTxHash: txHash,
+        }),
+      });
+    }
+
+    return { success: true, txHash };
+  } catch (err: any) {
+    console.error('[Stellar Snaps] Bridge error:', err);
+    throw err;
+  }
+}
+
 async function pollIntentStatus(
-  depositAddress: string,
+  intentId: string,
   modal: HTMLElement,
   onComplete: (success: boolean, txHash?: string) => void
 ) {
@@ -1306,7 +1427,7 @@ async function pollIntentStatus(
     
     try {
       const response = await fetch(
-        `${INTENTS_API_BASE}/api/intent/status?depositAddress=${encodeURIComponent(depositAddress)}`
+        `${INTENTS_API_BASE}/api/intent/status?intentId=${encodeURIComponent(intentId)}`
       );
       
       if (!response.ok) {
@@ -1398,6 +1519,7 @@ async function payWithIntent(
       try {
         const currentChainId = await callFreighter('getEVMChainId');
         if (currentChainId !== targetChainId) {
+          showNotification(`Switching to ${CHAIN_INFO[finalSelection.chain].name}...`, 'info');
           await callFreighter('switchEVMChain', { chainId: targetChainId });
         }
       } catch (err: any) {
@@ -1422,24 +1544,90 @@ async function payWithIntent(
   const confirmed = await showQuoteModal(quote, finalSelection.chain, finalSelection.asset, destAsset);
   if (!confirmed) return;
   
-  // 9. Show deposit modal with status tracking
-  let cancelPolling: (() => void) | null = null;
-  
-  const modal = showDepositModal(quote, finalSelection.asset, () => {
-    if (cancelPolling) cancelPolling();
-  });
-  
-  // 10. Start polling for status
-  cancelPolling = await pollIntentStatus(quote.depositAddress, modal, (success, txHash) => {
-    closeModal();
-    if (success) {
-      showResultModal(true, 'Your payment has been delivered to the merchant.', txHash);
-    } else {
-      showResultModal(false, 'Payment failed or was refunded. Please try again.');
+  // 9. Execute payment based on provider
+  if (quote.provider === 'allbridge' && selection.wallet.type === 'evm') {
+    // Direct bridge interaction for Allbridge
+    try {
+      showNotification('Processing bridge transaction...', 'info');
+      
+      const result = await executeAllbridgePayment(quote, finalSelection.chain);
+      
+      if (result.success) {
+        // Show success with tracking
+        showResultModal(
+          true, 
+          'Bridge transaction submitted! Your payment will arrive in ~2-5 minutes.',
+          result.txHash
+        );
+        
+        // Start background polling for status
+        if (quote.intentId) {
+          pollIntentStatusBackground(quote.intentId);
+        }
+      }
+    } catch (err: any) {
+      showResultModal(false, err.message || 'Bridge transaction failed');
     }
-  });
+  } else {
+    // Fallback: Show deposit modal for manual transfer
+    let cancelPolling: (() => void) | null = null;
+    
+    const modal = showDepositModal(quote, finalSelection.asset, () => {
+      if (cancelPolling) cancelPolling();
+    });
+    
+    // Start polling for status
+    if (quote.intentId) {
+      cancelPolling = await pollIntentStatus(quote.intentId, modal, (success, txHash) => {
+        closeModal();
+        if (success) {
+          showResultModal(true, 'Your payment has been delivered to the merchant.', txHash);
+        } else {
+          showResultModal(false, 'Payment failed or was refunded. Please try again.');
+        }
+      });
+    }
+  }
   
   return 'intent'; // Signal that intent flow was used
+}
+
+// Background polling - doesn't block UI
+async function pollIntentStatusBackground(intentId: string) {
+  const pollInterval = 10000; // 10 seconds
+  const maxPolls = 60; // 10 minutes max
+  let polls = 0;
+  
+  const poll = async () => {
+    if (polls >= maxPolls) return;
+    polls++;
+    
+    try {
+      const response = await fetch(
+        `${INTENTS_API_BASE}/api/intent/status?intentId=${encodeURIComponent(intentId)}`
+      );
+      
+      if (!response.ok) {
+        setTimeout(poll, pollInterval);
+        return;
+      }
+      
+      const status: IntentStatusResponse = await response.json();
+      
+      if (status.status === 'SUCCESS') {
+        showNotification('Payment delivered successfully!', 'success');
+      } else if (status.status === 'FAILED' || status.status === 'REFUNDED') {
+        showNotification('Payment failed or was refunded', 'error');
+      } else {
+        setTimeout(poll, pollInterval);
+      }
+    } catch (err) {
+      setTimeout(poll, pollInterval);
+    }
+  };
+  
+  // Start polling after a delay
+  setTimeout(poll, 30000); // Start after 30 seconds
 }
 
 // ============ UTILITIES ============
