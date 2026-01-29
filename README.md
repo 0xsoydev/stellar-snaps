@@ -1,135 +1,76 @@
-# Turborepo starter
+# Stellar Snaps
 
-This Turborepo starter is maintained by the Turborepo core team.
+Shareable payment links for the Stellar blockchain. Create snaps, share URLs, and let anyone pay with one click using Freighter.
 
-## Using this example
+**Live:** [stellar-snaps.vercel.app](https://stellar-snaps.vercel.app)
 
-Run the following command:
+## Repo structure
 
-```sh
-npx create-turbo@latest
+Monorepo (pnpm + Turborepo):
+
+| Path | Description |
+|------|-------------|
+| `apps/web` | Next.js app: dashboard, snap pages, API (snaps, registry, build-tx, etc.) |
+| `apps/extension` | Browser extension: detects snap links and shows payment cards |
+| `packages/core` | `@stellar-snaps/sdk` – create snaps, URIs, Freighter, discovery, etc. |
+| `packages/ui` | Shared UI components |
+| `packages/eslint-config` | Shared ESLint config |
+| `packages/typescript-config` | Shared tsconfigs |
+
+## Prerequisites
+
+- Node.js >= 18
+- pnpm 9 (or use corepack: `corepack enable pnpm`)
+
+## Setup
+
+```bash
+pnpm install
 ```
 
-## What's inside?
+### Web app (dashboard + API)
 
-This Turborepo includes the following packages/apps:
+1. Create `apps/web/.env` with `DATABASE_URL` (Neon or other Postgres).
+2. Push schema (creates `snaps` and `registry` tables):
+   ```bash
+   cd apps/web && pnpm db:push
+   ```
+3. Run:
+   ```bash
+   pnpm dev --filter=web
+   ```
+   Open [http://localhost:3000](http://localhost:3000).
 
-### Apps and Packages
+### Extension
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+1. Build:
+   ```bash
+   pnpm build --filter=@stellar-snaps/extension
+   ```
+2. In Chrome: `chrome://extensions` → Load unpacked → `apps/extension/dist`.
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+### SDK (packages/core)
 
-### Utilities
+- Used by web and extension via workspace; also published as `@stellar-snaps/sdk`.
+- Tests: `cd packages/core && pnpm test`
+- Build: `pnpm build --filter=@stellar-snaps/sdk`
 
-This Turborepo has some additional tools already setup for you:
+## Commands (from repo root)
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Run all apps in dev mode |
+| `pnpm build` | Build all packages and apps |
+| `pnpm lint` | Lint all packages |
+| `pnpm check-types` | Typecheck all packages |
+| `pnpm dev --filter=web` | Run only web app |
+| `pnpm build --filter=@stellar-snaps/sdk` | Build only SDK |
 
-### Build
+## Docs
 
-To build all apps and packages, run the following command:
+- [SDK API & usage](packages/core/README.md)
+- [Web app](apps/web/README.md)
 
-```
-cd my-turborepo
+## License
 
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+MIT
