@@ -19,9 +19,9 @@ export default function DashboardPage() {
     try {
       const { isConnected } = await freighterApi.isConnected();
       if (isConnected) {
-        const { address } = await freighterApi.getAddress();
-        if (address) {
-          setAddress(address);
+        const res = await freighterApi.getAddress();
+        if (res.address) {
+          setAddress(res.address);
         }
       }
     } catch (err) {
@@ -34,26 +34,25 @@ export default function DashboardPage() {
     setError('');
 
     try {
-      // requestAccess will prompt the user to connect if not already connected
-      // This works even if isConnected() returns false
-      const accessResult = await freighterApi.requestAccess();
-      
-      if (accessResult.error) {
-        setError(accessResult.error);
+      const { isConnected } = await freighterApi.isConnected();
+      if (!isConnected) {
+        setError('Freighter wallet not found. Please install it from freighter.app');
         setIsConnecting(false);
         return;
       }
 
-      const { address } = await freighterApi.getAddress();
-      if (address) {
-        setAddress(address);
+      // requestAccess() prompts user to authorize AND unlock if wallet is locked
+      const res = await freighterApi.requestAccess();
+      if (res.error) {
+        setError(res.error);
+      } else if (res.address) {
+        setAddress(res.address);
       } else {
-        setError('Failed to get address. Please unlock your wallet and try again.');
+        setError('Could not get address. Please try again.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Connect failed:', err);
-      // Check if Freighter is not installed at all
-      if (err?.message?.includes('Freighter') || err?.message?.includes('Extension')) {
+      if (err instanceof Error && err.message?.includes('Freighter is not connected')) {
         setError('Freighter wallet not found. Please install it from freighter.app');
       } else {
         setError(err instanceof Error ? err.message : 'Connection failed');
@@ -75,27 +74,27 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full text-center">
-          <span className="text-4xl mb-4 block">✦</span>
+          <img src="/stellar.png" alt="" className="h-12 w-auto mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Stellar Snaps</h1>
-          <p className="text-gray-400 mb-6">Connect your wallet to create shareable payment links</p>
+          <p className="font-inter-italic text-gray-400 mb-6">Connect your wallet to create shareable payment links</p>
 
           {error && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="text-red-400 text-sm">{error}</p>
+              <p className="font-inter-italic text-red-400 text-sm">{error}</p>
             </div>
           )}
 
           <button
             onClick={connect}
             disabled={isConnecting}
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="font-bricolage w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {isConnecting ? 'Connecting...' : 'Connect Freighter'}
           </button>
 
-          <p className="text-gray-500 text-xs mt-4">
+          <p className="font-inter-italic text-gray-500 text-xs mt-4">
             Don't have Freighter?{' '}
-            <a href="https://freighter.app" target="_blank" rel="noopener" className="text-purple-400 hover:underline">
+            <a href="https://freighter.app" target="_blank" rel="noopener" className="font-bricolage text-purple-400 hover:underline">
               Get it here
             </a>
           </p>
@@ -110,7 +109,7 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <span className="text-2xl text-purple-500">✦</span>
+            <img src="/stellar.png" alt="" className="h-8 w-auto" />
             <h1 className="text-xl font-bold text-white">Stellar Snaps</h1>
           </div>
           <div className="flex items-center gap-4">
@@ -119,7 +118,7 @@ export default function DashboardPage() {
             </span>
             <button
               onClick={disconnect}
-              className="text-gray-400 hover:text-white text-sm"
+              className="font-bricolage text-gray-400 hover:text-white text-sm"
             >
               Disconnect
             </button>

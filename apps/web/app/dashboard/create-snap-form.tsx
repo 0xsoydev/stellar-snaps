@@ -80,7 +80,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
     <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-xl p-6">
       {/* Title */}
       <div className="mb-4">
-        <label className="text-gray-400 text-sm mb-1 block">Title *</label>
+        <label className="font-inter-italic text-gray-400 text-sm mb-1 block">Title *</label>
         <input
           type="text"
           value={form.title}
@@ -105,7 +105,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Destination */}
       <div className="mb-4">
-        <label className="text-gray-400 text-sm mb-1 block">Destination Address *</label>
+        <label className="font-inter-italic text-gray-400 text-sm mb-1 block">Destination Address *</label>
         <input
           type="text"
           value={form.destination}
@@ -117,7 +117,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
         <button
           type="button"
           onClick={() => setForm({ ...form, destination: creator })}
-          className="text-purple-400 text-xs mt-1 hover:underline"
+          className="font-bricolage text-purple-400 text-xs mt-1 hover:underline"
         >
           Use my address
         </button>
@@ -125,7 +125,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Amount */}
       <div className="mb-4">
-        <label className="text-gray-400 text-sm mb-1 block">Amount (leave empty for open amount)</label>
+        <label className="font-inter-italic text-gray-400 text-sm mb-1 block">Amount (leave empty for open amount)</label>
         <div className="flex gap-2">
           <input
             type="number"
@@ -148,7 +148,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
 
       {/* Memo */}
       <div className="mb-6">
-        <label className="text-gray-400 text-sm mb-1 block">Memo</label>
+        <label className="font-inter-italic text-gray-400 text-sm mb-1 block">Memo</label>
         <input
           type="text"
           value={form.memo}
@@ -161,14 +161,14 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
       {/* Error */}
       {error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-          <p className="text-red-400 text-sm">{error}</p>
+          <p className="font-inter-italic text-red-400 text-sm">{error}</p>
         </div>
       )}
 
       {/* Success */}
       {success && (
         <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-          <p className="text-green-400 text-sm mb-2">Snap created!</p>
+          <p className="font-inter-italic text-green-400 text-sm mb-2">Snap created!</p>
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -179,7 +179,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
             <button
               type="button"
               onClick={copyLink}
-              className="text-purple-400 text-xs hover:underline"
+              className="font-bricolage text-purple-400 text-xs hover:underline"
             >
               Copy
             </button>
@@ -191,7 +191,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+        className="font-bricolage w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
       >
         {isSubmitting ? 'Creating...' : 'Create Snap'}
       </button>

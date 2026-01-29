@@ -18,6 +18,11 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-bricolage)", "system-ui", "sans-serif"],
+        bricolage: ["var(--font-bricolage)", "system-ui", "sans-serif"],
+        "inter-italic": ["var(--font-inter-italic)", "system-ui", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

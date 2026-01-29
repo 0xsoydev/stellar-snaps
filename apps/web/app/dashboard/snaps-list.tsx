@@ -61,7 +61,7 @@ export default function SnapsList({ creator, refreshKey }: Props) {
   if (loading) {
     return (
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <p className="text-gray-400 text-center">Loading...</p>
+        <p className="font-inter-italic text-gray-400 text-center">Loading...</p>
       </div>
     );
   }
@@ -81,14 +81,14 @@ export default function SnapsList({ creator, refreshKey }: Props) {
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <h3 className="text-white font-medium truncate">{snap.title}</h3>
-              <p className="text-gray-500 text-sm">
+              <p className="font-inter-italic text-gray-500 text-sm">
                 {snap.amount ? `${snap.amount} ${snap.assetCode || 'XLM'}` : 'Open amount'}
               </p>
             </div>
             <div className="flex items-center gap-2 ml-4">
               <button
                 onClick={() => copyLink(snap.id)}
-                className="text-purple-400 hover:text-purple-300 text-sm"
+                className="font-bricolage text-purple-400 hover:text-purple-300 text-sm"
               >
                 Copy
               </button>
@@ -96,13 +96,13 @@ export default function SnapsList({ creator, refreshKey }: Props) {
                 href={`/s/${snap.id}`}
                 target="_blank"
                 rel="noopener"
-                className="text-gray-400 hover:text-white text-sm"
+                className="font-bricolage text-gray-400 hover:text-white text-sm"
               >
                 View
               </a>
               <button
                 onClick={() => deleteSnap(snap.id)}
-                className="text-red-400 hover:text-red-300 text-sm"
+                className="font-bricolage text-red-400 hover:text-red-300 text-sm"
               >
                 Delete
               </button>
