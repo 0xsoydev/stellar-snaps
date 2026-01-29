@@ -30,14 +30,6 @@ interface QuoteRequestBody {
  * Creates an intent record and returns deposit instructions
  */
 export async function POST(request: NextRequest) {
-  // Feature flag - disable in production until ready
-  if (process.env.ENABLE_CROSS_CHAIN !== 'true') {
-    return NextResponse.json(
-      { error: 'Cross-chain payments not yet available' },
-      { status: 503, headers: corsHeaders }
-    );
-  }
-
   try {
     const body: QuoteRequestBody = await request.json();
     const { snapId, sourceChain, sourceAsset, refundAddress, dry = false } = body;

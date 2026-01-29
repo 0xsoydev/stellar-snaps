@@ -13,6 +13,13 @@
 const PROXY_URL = 'https://stellar-snaps.vercel.app/api/proxy';
 const REGISTRY_URL = 'https://stellar-snaps.vercel.app/api/registry';
 
+// ============ API CONFIGURATION ============
+// Toggle this for testing against preview deployments
+const USE_PREVIEW = true;
+const PREVIEW_URL = 'https://stellar-snaps-git-feat-near-intents-zer0days-projects.vercel.app';
+const PRODUCTION_URL = 'https://stellar-snaps.vercel.app';
+const API_BASE = USE_PREVIEW ? PREVIEW_URL : PRODUCTION_URL;
+
 const NETWORK_PASSPHRASES = {
   testnet: 'Test SDF Network ; September 2015',
   public: 'Public Global Stellar Network ; September 2015',
@@ -112,7 +119,7 @@ const EVM_CHAIN_IDS: Record<string, number> = {
 };
 
 // API base URL for intents
-const INTENTS_API_BASE = 'https://stellar-snaps.vercel.app';
+const INTENTS_API_BASE = API_BASE;
 
 // Caches
 let registryCache: Map<string, RegistryEntry> = new Map();
@@ -596,7 +603,7 @@ async function handleStellarPayment(
     const account = await accountRes.json();
     
     // Determine base URL from original href
-    let baseUrl = 'https://stellar-snaps.vercel.app';
+    let baseUrl = API_BASE;
     try {
       const parsed = new URL(originalHref);
       baseUrl = `${parsed.protocol}//${parsed.host}`;
