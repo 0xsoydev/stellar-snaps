@@ -37,21 +37,20 @@ export default function SnapPage({ snap }: Props) {
     try {
       // Check if Freighter is connected
       const { isConnected } = await freighterApi.isConnected();
-      
       if (!isConnected) {
         setError('Freighter wallet not found. Please install it from freighter.app');
         setStatus('error');
         return;
       }
 
-      // Request access if needed
-      const { isAllowed } = await freighterApi.isAllowed();
-      if (!isAllowed) {
-        await freighterApi.setAllowed();
+      // requestAccess() prompts user to authorize and unlock wallet if locked
+      const accessRes = await freighterApi.requestAccess();
+      if (accessRes.error) {
+        setError(accessRes.error);
+        setStatus('error');
+        return;
       }
-
-      // Get user's address and network
-      const { address } = await freighterApi.getAddress();
+      const address = accessRes.address;
       if (!address) {
         setError('Please connect your wallet');
         setStatus('error');
@@ -153,24 +152,24 @@ export default function SnapPage({ snap }: Props) {
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-2xl text-purple-500">✦</span>
+          <img src="/stellar.png" alt="" className="h-8 w-auto" />
           <h1 className="text-xl font-semibold text-white">{snap.title}</h1>
         </div>
 
         {/* Description */}
         {snap.description && (
-          <p className="text-gray-400 text-sm mb-6">{snap.description}</p>
+          <p className="font-inter-italic text-gray-400 text-sm mb-6">{snap.description}</p>
         )}
 
         {/* Success State */}
         {status === 'success' && (
           <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <p className="text-green-400 font-medium mb-2">Payment successful!</p>
+            <p className="font-inter-italic text-green-400 font-medium mb-2">Payment successful!</p>
             <a
               href={`https://stellar.expert/explorer/${snap.network || 'testnet'}/tx/${txHash}`}
               target="_blank"
               rel="noopener"
-              className="text-purple-400 text-sm hover:underline break-all"
+              className="font-bricolage text-purple-400 text-sm hover:underline break-all"
             >
               View transaction →
             </a>
@@ -197,7 +196,7 @@ export default function SnapPage({ snap }: Props) {
 
             {/* Destination */}
             <div className="mb-6 p-3 bg-gray-800/50 rounded-lg">
-              <p className="text-gray-500 text-xs mb-1">Sending to</p>
+              <p className="font-inter-italic text-gray-500 text-xs mb-1">Sending to</p>
               <p className="text-gray-300 text-sm font-mono truncate">{snap.destination}</p>
             </div>
           </>
@@ -206,7 +205,7 @@ export default function SnapPage({ snap }: Props) {
         {/* Error */}
         {error && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <p className="text-red-400 text-sm">{error}</p>
+            <p className="font-inter-italic text-red-400 text-sm">{error}</p>
           </div>
         )}
 
@@ -215,7 +214,7 @@ export default function SnapPage({ snap }: Props) {
           <button
             onClick={handlePay}
             disabled={status === 'connecting' || status === 'signing' || status === 'submitting'}
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="font-bricolage w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {status === 'connecting' && 'Connecting...'}
             {status === 'signing' && 'Signing...'}
