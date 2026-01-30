@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, pgEnum, integer } from 'drizzle-orm/pg-core';
 
 // Registry status enum
 export const registryStatusEnum = pgEnum('registry_status', ['pending', 'trusted', 'unverified', 'blocked']);
@@ -59,3 +59,44 @@ export const registry = pgTable('registry', {
 
 export type RegistryEntry = typeof registry.$inferSelect;
 export type NewRegistryEntry = typeof registry.$inferInsert;
+
+// ============ DEVELOPERS TABLE ============
+
+export const developers = pgTable('developers', {
+  id: text('id').primaryKey(),
+  walletAddress: text('wallet_address').notNull().unique(),
+  name: text('name'),
+  email: text('email'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export type Developer = typeof developers.$inferSelect;
+export type NewDeveloper = typeof developers.$inferInsert;
+
+// ============ API KEYS TABLE ============
+
+export const apiKeys = pgTable('api_keys', {
+  id: text('id').primaryKey(),
+  developerId: text('developer_id').notNull().references(() => developers.id, { onDelete: 'cascade' }),
+  keyHash: text('key_hash').notNull().unique(),
+  keyPrefix: text('key_prefix').notNull(), // First 8 chars for display: "sk_live_a1b2..."
+  name: text('name').default('Default'),
+  createdAt: timestamp('created_at').defaultNow(),
+  lastUsedAt: timestamp('last_used_at'),
+  revokedAt: timestamp('revoked_at'),
+});
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type NewApiKey = typeof apiKeys.$inferInsert;
+
+// ============ AUTH CHALLENGES TABLE ============
+
+export const authChallenges = pgTable('auth_challenges', {
+  id: text('id').primaryKey(),
+  walletAddress: text('wallet_address').notNull(),
+  challenge: text('challenge').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
