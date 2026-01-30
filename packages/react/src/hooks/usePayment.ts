@@ -1,5 +1,8 @@
 /**
  * usePayment - Hook for handling the payment flow
+ * 
+ * Uses the /api/build-tx endpoint to build transactions server-side,
+ * avoiding the need for @stellar/stellar-sdk on the client.
  */
 
 import { useState, useCallback } from 'react';
@@ -38,6 +41,9 @@ export interface UsePaymentOptions {
   
   /** Called when status changes */
   onStatusChange?: (status: PaymentStatus) => void;
+  
+  /** Custom base URL for build-tx endpoint (default: from context or stellar-snaps.vercel.app) */
+  baseUrl?: string;
 }
 
 export interface UsePaymentResult {
@@ -55,21 +61,27 @@ export interface UsePaymentResult {
   reset: () => void;
 }
 
-// Stellar SDK server URLs
+// Stellar Horizon URLs
 const HORIZON_URLS = {
   public: 'https://horizon.stellar.org',
   testnet: 'https://horizon-testnet.stellar.org',
 };
 
+// Default API base URL
+const DEFAULT_BASE_URL = 'https://stellar-snaps.vercel.app';
+
 export function usePayment(options: UsePaymentOptions): UsePaymentResult {
-  const { payment, onSuccess, onError, onStatusChange } = options;
+  const { payment, onSuccess, onError, onStatusChange, baseUrl: optBaseUrl } = options;
   
   const context = useStellarSnapsOptional();
-  const { wallet, connect, signTransaction, getNetworkPassphrase } = useFreighter();
+  const { wallet, connect, signTransaction } = useFreighter();
   
   const [status, setStatus] = useState<PaymentStatus>('idle');
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  
+  // Get base URL from options, context, or default
+  const baseUrl = optBaseUrl ?? context?.baseUrl ?? DEFAULT_BASE_URL;
   
   const updateStatus = useCallback((newStatus: PaymentStatus) => {
     setStatus(newStatus);
@@ -99,10 +111,9 @@ export function usePayment(options: UsePaymentOptions): UsePaymentResult {
         }
       }
       
-      // Step 2: Build transaction
+      // Step 2: Fetch account to get sequence number
       updateStatus('building');
       
-      // Fetch account to get sequence number
       const accountResponse = await fetch(`${horizonUrl}/accounts/${sourceAddress}`);
       if (!accountResponse.ok) {
         if (accountResponse.status === 404) {
@@ -112,47 +123,44 @@ export function usePayment(options: UsePaymentOptions): UsePaymentResult {
       }
       const account = await accountResponse.json();
       
-      // Build the transaction using XDR (simplified - real implementation would use stellar-sdk)
-      // For now, we'll use the Horizon API to build and submit
-      
-      // Step 3: Create payment operation
-      const asset = payment.assetCode === 'XLM' || !payment.assetCode
-        ? { asset_type: 'native' }
-        : { 
-            asset_type: 'credit_alphanum4',
-            asset_code: payment.assetCode,
-            asset_issuer: payment.assetIssuer,
-          };
-      
-      // Build transaction XDR
-      // Note: In a real implementation, you would use @stellar/stellar-sdk
-      // This is a simplified version that works with Horizon's tx builder
-      const txBuilderUrl = `${horizonUrl}/transactions`;
-      
-      // For the actual implementation, we need to use stellar-sdk
-      // For now, we'll throw a helpful error
-      updateStatus('signing');
-      
-      // Since we don't have stellar-sdk, let's use a workaround
-      // We'll construct a basic payment transaction XDR
-      const txXdr = await buildPaymentXdr({
-        source: sourceAddress,
-        destination: payment.destination,
-        amount: payment.amount ?? '0',
-        asset: payment.assetCode ?? 'XLM',
-        assetIssuer: payment.assetIssuer,
-        memo: payment.memo,
-        sequence: (BigInt(account.sequence) + BigInt(1)).toString(),
-        network,
+      // Step 3: Build transaction via API
+      const buildResponse = await fetch(`${baseUrl}/api/build-tx`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source: sourceAddress,
+          sequence: account.sequence,
+          destination: payment.destination,
+          amount: payment.amount ?? '0',
+          assetCode: payment.assetCode ?? 'XLM',
+          assetIssuer: payment.assetIssuer,
+          memo: payment.memo,
+          memoType: payment.memoType,
+          network,
+        }),
       });
       
+      if (!buildResponse.ok) {
+        const buildError = await buildResponse.json().catch(() => ({}));
+        throw new Error(buildError.error || `Failed to build transaction: ${buildResponse.status}`);
+      }
+      
+      const { xdr } = await buildResponse.json();
+      
+      if (!xdr) {
+        throw new Error('No transaction XDR returned from build endpoint');
+      }
+      
       // Step 4: Sign with Freighter
-      const signedXdr = await signTransaction(txXdr, network);
+      updateStatus('signing');
+      const signedXdr = await signTransaction(xdr, network);
       
       // Step 5: Submit transaction
       updateStatus('submitting');
       
-      const submitResponse = await fetch(txBuilderUrl, {
+      const submitResponse = await fetch(`${horizonUrl}/transactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -163,7 +171,11 @@ export function usePayment(options: UsePaymentOptions): UsePaymentResult {
       const result = await submitResponse.json();
       
       if (!submitResponse.ok) {
-        throw new Error(result.extras?.result_codes?.operations?.[0] || result.title || 'Transaction failed');
+        const errorCode = result.extras?.result_codes?.operations?.[0] 
+          || result.extras?.result_codes?.transaction
+          || result.title 
+          || 'Transaction failed';
+        throw new Error(errorCode);
       }
       
       const hash = result.hash;
@@ -179,7 +191,7 @@ export function usePayment(options: UsePaymentOptions): UsePaymentResult {
       onError?.(error);
       return null;
     }
-  }, [payment, wallet, connect, signTransaction, context, onSuccess, onError, updateStatus]);
+  }, [payment, wallet, connect, signTransaction, context, baseUrl, onSuccess, onError, updateStatus]);
   
   const reset = useCallback(() => {
     setStatus('idle');
@@ -195,62 +207,4 @@ export function usePayment(options: UsePaymentOptions): UsePaymentResult {
     pay,
     reset,
   };
-}
-
-// Simplified XDR builder (would use stellar-sdk in production)
-async function buildPaymentXdr(options: {
-  source: string;
-  destination: string;
-  amount: string;
-  asset: string;
-  assetIssuer?: string;
-  memo?: string;
-  sequence: string;
-  network: Network;
-}): Promise<string> {
-  // In production, you would use @stellar/stellar-sdk to build this
-  // For now, we'll use a fetch to a helper endpoint or throw
-  
-  // Check if stellar-sdk is available globally (some apps might include it)
-  // @ts-expect-error - checking for global StellarSdk
-  if (typeof window !== 'undefined' && window.StellarSdk) {
-    // @ts-expect-error - using global StellarSdk
-    const StellarSdk = window.StellarSdk;
-    const server = new StellarSdk.Horizon.Server(
-      options.network === 'public' 
-        ? 'https://horizon.stellar.org'
-        : 'https://horizon-testnet.stellar.org'
-    );
-    
-    const sourceAccount = await server.loadAccount(options.source);
-    
-    let asset;
-    if (options.asset === 'XLM' || !options.asset) {
-      asset = StellarSdk.Asset.native();
-    } else {
-      asset = new StellarSdk.Asset(options.asset, options.assetIssuer);
-    }
-    
-    const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase: options.network === 'public'
-        ? StellarSdk.Networks.PUBLIC
-        : StellarSdk.Networks.TESTNET,
-    })
-      .addOperation(StellarSdk.Operation.payment({
-        destination: options.destination,
-        asset,
-        amount: options.amount,
-      }))
-      .setTimeout(180)
-      .build();
-    
-    return transaction.toXDR();
-  }
-  
-  // Fallback: throw error with helpful message
-  throw new Error(
-    'Transaction building requires @stellar/stellar-sdk. ' +
-    'Please install it: npm install @stellar/stellar-sdk'
-  );
 }
