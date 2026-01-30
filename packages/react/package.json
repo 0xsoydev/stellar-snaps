@@ -2,6 +2,7 @@
   "name": "@stellar-snaps/react",
   "version": "0.1.0",
   "description": "React hooks and components for Stellar Snaps payments",
+  "private": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -11,17 +12,18 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./dist/styles.css"
   },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --external react",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external react && cp src/styles.css dist/styles.css 2>/dev/null || true",
     "dev": "tsup src/index.ts --format cjs,esm --dts --external react --watch",
     "check-types": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run build"
   },
   "peerDependencies": {
     "react": ">=17.0.0",
@@ -45,12 +47,20 @@
     "payments",
     "react",
     "hooks",
-    "components"
+    "components",
+    "freighter",
+    "xlm",
+    "usdc"
   ],
+  "author": "0xsoydev",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/stellar-snaps.git",
+    "url": "https://github.com/0xsoydev/stellar-snaps.git",
     "directory": "packages/react"
+  },
+  "homepage": "https://stellar-snaps.vercel.app",
+  "bugs": {
+    "url": "https://github.com/0xsoydev/stellar-snaps/issues"
   }
 }
