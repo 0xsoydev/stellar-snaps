@@ -395,27 +395,28 @@ function renderCard(
 
   card.innerHTML = `
     <div class="snap-card-header">
-      <span class="snap-card-logo">✦</span>
-      <span class="snap-card-title">${escapeHtml(metadata.title)}</span>
+      <div class="snap-card-brand">
+        <span class="snap-card-logo">✦</span>
+        <span class="snap-card-title">${escapeHtml(metadata.title)}</span>
+      </div>
       ${trustBadge}
     </div>
     ${metadata.description ? `<p class="snap-card-desc">${escapeHtml(metadata.description)}</p>` : ''}
     <div class="snap-card-amount">
       ${hasFixedAmount
         ? `<span class="snap-fixed-amount">${metadata.amount}</span>`
-        : '<input type="number" placeholder="Enter amount" class="snap-amount-input" step="any" min="0" />'}
+        : '<input type="number" placeholder="0.00" class="snap-amount-input" step="any" min="0" />'}
       <span class="snap-asset">${metadata.assetCode || 'XLM'}</span>
     </div>
     <div class="snap-card-destination">
-      <span class="snap-dest-label">To:</span>
-      <span class="snap-dest-value">${metadata.destination.slice(0, 6)}...${metadata.destination.slice(-4)}</span>
+      <span class="snap-dest-value">${metadata.destination.slice(0, 4)}...${metadata.destination.slice(-4)}</span>
     </div>
-    <button class="snap-pay-btn">Pay with Stellar</button>
+    <button class="snap-pay-btn">Pay</button>
+    <div class="snap-status"></div>
     <div class="snap-card-footer">
       <span class="snap-network-badge">${network}</span>
-      <a href="${originalHref}" target="_blank" class="snap-view-link">View</a>
+      <a href="${originalHref}" target="_blank" class="snap-view-link">Details</a>
     </div>
-    <div class="snap-status"></div>
   `;
 
   // Find the best insertion point and hide Twitter's native card
