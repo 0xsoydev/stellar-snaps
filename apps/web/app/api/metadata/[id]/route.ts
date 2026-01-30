@@ -3,6 +3,17 @@ import { db } from '../../../../lib/db';
 import { snaps } from '../../../../lib/db/schema';
 import { eq } from 'drizzle-orm';
 
+// Handle CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
 // GET /api/metadata/[id] - get snap metadata for extension
 export async function GET(
   request: NextRequest,

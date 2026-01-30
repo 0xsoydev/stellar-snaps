@@ -1,26 +1,31 @@
 // Popup script - settings and status
+import * as freighterApi from '@stellar/freighter-api';
+
 document.addEventListener('DOMContentLoaded', async () => {
   const statusEl = document.getElementById('status');
   
-  // Check Freighter connection
-  const freighter = (window as any).freighter;
-  
-  if (freighter) {
-    try {
-      const { isConnected } = await freighter.isConnected();
-      if (statusEl) {
-        statusEl.textContent = isConnected ? 'Connected to Freighter' : 'Freighter not connected';
-        statusEl.className = isConnected ? 'status-ok' : 'status-warn';
-      }
-    } catch {
-      if (statusEl) {
-        statusEl.textContent = 'Freighter available';
-        statusEl.className = 'status-ok';
+  try {
+    const { isConnected } = await freighterApi.isConnected();
+    if (statusEl) {
+      if (isConnected) {
+        // Get address to show connected account
+        try {
+          const { address } = await freighterApi.getAddress();
+          statusEl.textContent = `Connected: ${address.slice(0, 4)}...${address.slice(-4)}`;
+          statusEl.className = 'status-ok';
+        } catch {
+          statusEl.textContent = 'Freighter connected';
+          statusEl.className = 'status-ok';
+        }
+      } else {
+        statusEl.textContent = 'Click Freighter to connect';
+        statusEl.className = 'status-warn';
       }
     }
-  } else {
+  } catch (err) {
+    console.log('Freighter check error:', err);
     if (statusEl) {
-      statusEl.textContent = 'Freighter not installed';
+      statusEl.textContent = 'Freighter not detected';
       statusEl.className = 'status-error';
     }
   }

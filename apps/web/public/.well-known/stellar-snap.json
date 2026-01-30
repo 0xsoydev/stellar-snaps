@@ -1,0 +1,11 @@
+{
+  "name": "Stellar Snaps",
+  "description": "Shareable payment links for Stellar",
+  "icon": "https://stellar-snaps.vercel.app/icon.png",
+  "rules": [
+    {
+      "pathPattern": "/s/*",
+      "apiPath": "/api/metadata/*"
+    }
+  ]
+}

@@ -1,69 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import * as freighterApi from '@stellar/freighter-api';
+import { useState } from 'react';
+import { useWalletConnection } from './use-wallet-connection';
+import { ConnectWalletView } from './connect-wallet-view';
+import { DashboardHeader } from './dashboard-header';
+import { DisconnectModal } from './disconnect-modal';
 import CreateSnapForm from './create-snap-form';
 import SnapsList from './snaps-list';
 
 export default function DashboardPage() {
-  const [address, setAddress] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState('');
+  const { address, isConnecting, error, connect, disconnect } = useWalletConnection();
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    checkConnection();
-  }, []);
-
-  const checkConnection = async () => {
-    try {
-      const { isConnected } = await freighterApi.isConnected();
-      if (isConnected) {
-        const res = await freighterApi.getAddress();
-        if (res.address) {
-          setAddress(res.address);
-        }
-      }
-    } catch (err) {
-      console.error('Connection check failed:', err);
-    }
-  };
-
-  const connect = async () => {
-    setIsConnecting(true);
-    setError('');
-
-    try {
-      const { isConnected } = await freighterApi.isConnected();
-      if (!isConnected) {
-        setError('Freighter wallet not found. Please install it from freighter.app');
-        setIsConnecting(false);
-        return;
-      }
-
-      // requestAccess() prompts user to authorize AND unlock if wallet is locked
-      const res = await freighterApi.requestAccess();
-      if (res.error) {
-        setError(res.error);
-      } else if (res.address) {
-        setAddress(res.address);
-      } else {
-        setError('Could not get address. Please try again.');
-      }
-    } catch (err: unknown) {
-      console.error('Connect failed:', err);
-      if (err instanceof Error && err.message?.includes('Freighter is not connected')) {
-        setError('Freighter wallet not found. Please install it from freighter.app');
-      } else {
-        setError(err instanceof Error ? err.message : 'Connection failed');
-      }
-    }
-
-    setIsConnecting(false);
-  };
-
-  const disconnect = () => {
-    setAddress(null);
+  const handleDisconnectConfirm = () => {
+    disconnect();
+    setShowDisconnectModal(false);
   };
 
   const handleSnapCreated = () => {
@@ -72,71 +24,31 @@ export default function DashboardPage() {
 
   if (!address) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full text-center">
-          <img src="/stellar.png" alt="" className="h-12 w-auto mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Stellar Snaps</h1>
-          <p className="font-inter-italic text-gray-400 mb-6">Connect your wallet to create shareable payment links</p>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="font-inter-italic text-red-400 text-sm">{error}</p>
-            </div>
-          )}
-
-          <button
-            onClick={connect}
-            disabled={isConnecting}
-            className="font-bricolage w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {isConnecting ? 'Connecting...' : 'Connect Freighter'}
-          </button>
-
-          <p className="font-inter-italic text-gray-500 text-xs mt-4">
-            Don't have Freighter?{' '}
-            <a href="https://freighter.app" target="_blank" rel="noopener" className="font-bricolage text-purple-400 hover:underline">
-              Get it here
-            </a>
-          </p>
-        </div>
-      </div>
+      <ConnectWalletView
+        onConnect={connect}
+        isConnecting={isConnecting}
+        error={error}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <img src="/stellar.png" alt="" className="h-8 w-auto" />
-            <h1 className="text-xl font-bold text-white">Stellar Snaps</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-400 text-sm font-mono">
-              {address.slice(0, 4)}...{address.slice(-4)}
-            </span>
-            <button
-              onClick={disconnect}
-              className="font-bricolage text-gray-400 hover:text-white text-sm"
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-dashboard-dots px-4 pt-5 pb-12 md:px-8 md:pt-6">
+      <div className="max-w-5xl mx-auto">
+        <DashboardHeader
+          address={address}
+          onDisconnectClick={() => setShowDisconnectModal(true)}
+        />
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Create Form */}
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-4">Create New Snap</h2>
-            <CreateSnapForm creator={address} onCreated={handleSnapCreated} />
-          </div>
+        <DisconnectModal
+          open={showDisconnectModal}
+          onClose={() => setShowDisconnectModal(false)}
+          onConfirm={handleDisconnectConfirm}
+        />
 
-          {/* Snaps List */}
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-4">Your Snaps</h2>
-            <SnapsList creator={address} refreshKey={refreshKey} />
-          </div>
+        <div className="grid md:grid-cols-2 gap-8 md:gap-10">
+          <CreateSnapForm creator={address} onCreated={handleSnapCreated} />
+          <SnapsList creator={address} refreshKey={refreshKey} />
         </div>
       </div>
     </div>

@@ -52,3 +52,15 @@ a {
     display: unset;
   }
 }
+
+@layer utilities {
+  /* Palette from #3e3d3f: darken for bg, lighten for surfaces/text */
+  .bg-dashboard-dots {
+    background-color: #1e1d1f;
+    background-image: radial-gradient(
+      #4e4d4f 1.5px,
+      transparent 1.5px
+    );
+    background-size: 20px 20px;
+  }
+}
