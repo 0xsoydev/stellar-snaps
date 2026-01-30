@@ -22,7 +22,7 @@ import {
 import '@stellar-snaps/react/styles.css';
 
 // Demo destination wallet (testnet)
-const DEMO_DESTINATION = 'GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOUJ3DYHEX6GUG3D';
+const DEMO_DESTINATION = 'GCNZMNUTQ5UMQ5QLOFUAW3CUADWBGWKLS4RN2NOLPAY757CYORI4TQ55';
 
 function DemoContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
