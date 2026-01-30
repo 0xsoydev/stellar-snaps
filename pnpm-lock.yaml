@@ -54,6 +54,9 @@ importers:
       '@stellar-snaps/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@stellar-snaps/react':
+        specifier: workspace:*
+        version: link:../../packages/react
       '@stellar/freighter-api':
         specifier: ^6.0.1
         version: 6.0.1

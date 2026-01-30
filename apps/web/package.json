@@ -17,6 +17,7 @@
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@stellar-snaps/core": "workspace:*",
+    "@stellar-snaps/react": "workspace:*",
     "@repo/ui": "workspace:*",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^13.0.0",
