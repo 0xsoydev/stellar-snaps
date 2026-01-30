@@ -22,7 +22,7 @@ const SLIDES = [
     ctaHref: '/developers',
     nextLabel: '← Create Snap',
   },
-];
+] as const;
 
 export default function CreateSnapDemoSlider() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -104,9 +104,9 @@ export default function CreateSnapDemoSlider() {
 
         {/* Dots */}
         <div className="flex justify-center gap-2 mt-6">
-          {SLIDES.map((_, i) => (
+          {SLIDES.map((slide, i) => (
             <button
-              key={SLIDES[i].id}
+              key={slide.id}
               type="button"
               onClick={() => goToSlide(i)}
               className={`w-2.5 h-2.5 rounded-full transition-colors ${

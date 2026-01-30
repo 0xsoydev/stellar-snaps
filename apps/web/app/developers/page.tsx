@@ -163,7 +163,7 @@ export default function DevelopersPage() {
             )}
 
             <button
-              onClick={connect}
+              onClick={() => connect()}
               disabled={isConnecting}
               className="font-bricolage w-full bg-[#fe330a] hover:bg-[#d92b08] text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
             >
