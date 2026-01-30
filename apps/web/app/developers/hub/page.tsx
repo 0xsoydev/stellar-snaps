@@ -236,9 +236,18 @@ export default function DevelopersHubPage() {
               href="/developers/hub/api-keys"
               className="block p-6 rounded-xl border border-gray-800 hover:border-[#fe330a]/50 bg-gray-900/50 transition-colors"
             >
-              <h3 className="font-semibold text-white mb-2">API Key Creation</h3>
+              <h3 className="font-semibold text-white mb-2">API Keys</h3>
               <p className="font-inter-italic text-sm text-gray-400">
                 Create and manage API keys to integrate Stellar Snaps programmatically.
+              </p>
+            </Link>
+            <Link
+              href="/developers/hub/domains"
+              className="block p-6 rounded-xl border border-gray-800 hover:border-[#fe330a]/50 bg-gray-900/50 transition-colors"
+            >
+              <h3 className="font-semibold text-white mb-2">Domain Registry</h3>
+              <p className="font-inter-italic text-sm text-gray-400">
+                Register your domains to show as trusted in the extension.
               </p>
             </Link>
           </section>

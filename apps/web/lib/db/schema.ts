@@ -64,9 +64,10 @@ export type NewRegistryEntry = typeof registry.$inferInsert;
 
 export const developers = pgTable('developers', {
   id: text('id').primaryKey(),
-  walletAddress: text('wallet_address').notNull().unique(),
+  email: text('email').notNull().unique(),
   name: text('name'),
-  email: text('email'),
+  // Optional wallet address for future features
+  walletAddress: text('wallet_address'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -90,13 +91,16 @@ export const apiKeys = pgTable('api_keys', {
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type NewApiKey = typeof apiKeys.$inferInsert;
 
-// ============ AUTH CHALLENGES TABLE ============
+// ============ MAGIC LINKS TABLE ============
 
-export const authChallenges = pgTable('auth_challenges', {
+export const magicLinks = pgTable('magic_links', {
   id: text('id').primaryKey(),
-  walletAddress: text('wallet_address').notNull(),
-  challenge: text('challenge').notNull().unique(),
+  email: text('email').notNull(),
+  token: text('token').notNull().unique(),
   expiresAt: timestamp('expires_at').notNull(),
   usedAt: timestamp('used_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export type MagicLink = typeof magicLinks.$inferSelect;
+export type NewMagicLink = typeof magicLinks.$inferInsert;

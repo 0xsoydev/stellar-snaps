@@ -44,10 +44,34 @@ export function generateChallenge(): string {
 }
 
 /**
+ * Generate a secure magic link token
+ */
+export function generateMagicToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
+/**
+ * Calculate magic link expiry (15 minutes from now)
+ */
+export function getMagicLinkExpiry(): Date {
+  return new Date(Date.now() + 15 * 60 * 1000);
+}
+
+/**
  * Calculate challenge expiry (5 minutes from now)
  */
 export function getChallengeExpiry(): Date {
   return new Date(Date.now() + 5 * 60 * 1000);
+}
+
+/**
+ * Validate email format
+ */
+export function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== 'string') return false;
+  // Basic email regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
 }
 
 /**

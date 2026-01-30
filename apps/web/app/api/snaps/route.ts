@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const results = await db
     .select()
     .from(snaps)
-    .where(eq(snaps.creator, auth.auth.developer.walletAddress))
+    .where(eq(snaps.creator, auth.auth.developer.id))
     .orderBy(snaps.createdAt);
 
   return NextResponse.json({ snaps: results }, { headers: corsHeaders });
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     const [newSnap] = await db.insert(snaps).values({
       id,
-      creator: auth.auth.developer.walletAddress,
+      creator: auth.auth.developer.id,
       title,
       description: description || null,
       destination,
@@ -123,7 +123,7 @@ export async function DELETE(request: NextRequest) {
     .from(snaps)
     .where(and(
       eq(snaps.id, id),
-      eq(snaps.creator, auth.auth.developer.walletAddress)
+      eq(snaps.creator, auth.auth.developer.id)
     ));
 
   if (!snap) {

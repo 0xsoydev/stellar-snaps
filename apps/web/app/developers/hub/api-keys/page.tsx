@@ -1,37 +1,61 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useApiAuth } from '@/lib/hooks/use-api-auth';
+import { useEmailAuth } from '@/lib/hooks/use-email-auth';
 
-export default function ApiKeysPage() {
+function ApiKeysContent() {
+  const searchParams = useSearchParams();
+  
   const {
-    walletAddress,
-    isWalletConnected,
+    email,
     isAuthenticated,
     isLoading,
-    isConnecting,
-    isAuthenticating,
+    isSendingLink,
     error,
-    connectWallet,
-    authenticate,
+    sendMagicLink,
+    setAuthFromUrl,
     logout,
     keys,
     isLoadingKeys,
     createKey,
     revokeKey,
-  } = useApiAuth();
+  } = useEmailAuth();
 
+  const [emailInput, setEmailInput] = useState('');
+  const [linkSent, setLinkSent] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [showNewKey, setShowNewKey] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
-  const handleAuthenticate = async () => {
-    const key = await authenticate();
-    if (key) {
-      setShowNewKey(key);
+  // Check URL params for magic link callback
+  useEffect(() => {
+    const newKey = searchParams.get('newKey');
+    const emailParam = searchParams.get('email');
+    const errorParam = searchParams.get('error');
+
+    if (errorParam) {
+      setUrlError(errorParam);
+      // Clean URL
+      window.history.replaceState({}, '', '/developers/hub/api-keys');
+    }
+
+    if (newKey && emailParam) {
+      setAuthFromUrl(newKey, emailParam);
+      setShowNewKey(newKey);
+      // Clean URL
+      window.history.replaceState({}, '', '/developers/hub/api-keys');
+    }
+  }, [searchParams, setAuthFromUrl]);
+
+  const handleSendLink = async () => {
+    const success = await sendMagicLink(emailInput);
+    if (success) {
+      setLinkSent(true);
     }
   };
 
@@ -62,10 +86,6 @@ export default function ApiKeysPage() {
     setCopied(false);
   };
 
-  const truncatedWallet = walletAddress
-    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
-    : '';
-
   // Background component
   const background = (
     <div className="absolute inset-0 pointer-events-none z-0 opacity-40">
@@ -93,37 +113,7 @@ export default function ApiKeysPage() {
     );
   }
 
-  // Not connected
-  if (!isWalletConnected) {
-    return (
-      <div className="min-h-screen bg-black text-white relative overflow-hidden flex items-center justify-center p-4">
-        {background}
-        <div className="relative z-10 w-full max-w-md text-center">
-          <Link href="/" className="inline-block mb-6">
-            <img src="/stellar.png" alt="Stellar Snaps" className="h-10 mx-auto" />
-          </Link>
-          <h1 className="text-2xl font-bold mb-2">Connect Wallet</h1>
-          <p className="text-gray-400 mb-6">
-            Connect your Freighter wallet to manage API keys.
-          </p>
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-          <button
-            onClick={connectWallet}
-            disabled={isConnecting}
-            className="w-full bg-[#fe330a] hover:bg-[#d92b08] text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
-          >
-            {isConnecting ? 'Connecting...' : 'Connect Freighter'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Connected but not authenticated
+  // Not authenticated - show email input
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-black text-white relative overflow-hidden flex items-center justify-center p-4">
@@ -132,31 +122,53 @@ export default function ApiKeysPage() {
           <Link href="/" className="inline-block mb-6">
             <img src="/stellar.png" alt="Stellar Snaps" className="h-10 mx-auto" />
           </Link>
-          <h1 className="text-2xl font-bold mb-2">Sign to Authenticate</h1>
-          <p className="text-gray-400 mb-2">
-            Connected as <span className="text-white font-mono">{truncatedWallet}</span>
-          </p>
-          <p className="text-gray-500 text-sm mb-6">
-            Sign a message with your wallet to get your API key.
-          </p>
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
+          
+          {linkSent ? (
+            <>
+              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-[#fe330a]/10 flex items-center justify-center">
+                <svg className="w-8 h-8 text-[#fe330a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold mb-2">Check your email</h1>
+              <p className="text-gray-400 mb-6">
+                We sent a sign-in link to <span className="text-white">{emailInput}</span>
+              </p>
+              <button
+                onClick={() => setLinkSent(false)}
+                className="text-gray-500 hover:text-white text-sm transition-colors"
+              >
+                Use a different email
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold mb-2">Sign in</h1>
+              <p className="text-gray-400 mb-6">
+                Enter your email to get a sign-in link.
+              </p>
+              {(error || urlError) && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                  {error || urlError}
+                </div>
+              )}
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#fe330a]/50 mb-4"
+                onKeyDown={(e) => e.key === 'Enter' && handleSendLink()}
+              />
+              <button
+                onClick={handleSendLink}
+                disabled={isSendingLink || !emailInput}
+                className="w-full bg-[#fe330a] hover:bg-[#d92b08] text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {isSendingLink ? 'Sending...' : 'Send Sign-in Link'}
+              </button>
+            </>
           )}
-          <button
-            onClick={handleAuthenticate}
-            disabled={isAuthenticating}
-            className="w-full bg-[#fe330a] hover:bg-[#d92b08] text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
-          >
-            {isAuthenticating ? 'Signing...' : 'Sign & Get API Key'}
-          </button>
-          <button
-            onClick={logout}
-            className="mt-4 text-gray-500 hover:text-white text-sm transition-colors"
-          >
-            Use different wallet
-          </button>
         </div>
       </div>
     );
@@ -206,7 +218,7 @@ export default function ApiKeysPage() {
             <h1 className="text-xl font-bold">API Keys</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-sm text-gray-400">{truncatedWallet}</span>
+            <span className="text-sm text-gray-400">{email}</span>
             <button
               onClick={logout}
               className="text-sm text-gray-500 hover:text-white transition-colors"
@@ -293,5 +305,34 @@ export default function ApiKeysPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-black text-white relative overflow-hidden flex items-center justify-center">
+      <div className="absolute inset-0 pointer-events-none z-0 opacity-40">
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(254, 51, 10, 0.2) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(254, 51, 10, 0.2) 1px, transparent 1px)
+            `,
+            backgroundSize: '80px 80px',
+            filter: 'blur(3px)',
+          }}
+        />
+      </div>
+      <div className="relative z-10 text-gray-400">Loading...</div>
+    </div>
+  );
+}
+
+export default function ApiKeysPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ApiKeysContent />
+    </Suspense>
   );
 }

@@ -1,93 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { authChallenges, developers, apiKeys } from '@/lib/db/schema';
+import { magicLinks, developers, apiKeys } from '@/lib/db/schema';
 import { eq, and, isNull, gt } from 'drizzle-orm';
-import { generateId, generateApiKey, isValidStellarAddress } from '@/lib/auth/utils';
-import { verifySignature } from '@/lib/auth/verify';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-export async function OPTIONS() {
-  return new NextResponse(null, { headers: corsHeaders });
-}
+import { generateId, generateApiKey } from '@/lib/auth/utils';
 
 /**
- * POST /api/auth/verify
+ * GET /api/auth/verify?token=xxx
  * 
- * Verify a signed challenge and return an API key.
+ * Verify a magic link token and return an API key.
  * Creates a new developer account if one doesn't exist.
- * 
- * Body: { walletAddress: string, challenge: string, signature: string }
- * Response: { developer: {...}, apiKey: string } (key only shown once!)
+ * Redirects to the API keys page with the new key.
  */
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { walletAddress, challenge, signature } = body;
+    const token = request.nextUrl.searchParams.get('token');
 
-    // Validate inputs
-    if (!walletAddress || !isValidStellarAddress(walletAddress)) {
-      return NextResponse.json(
-        { error: 'Invalid wallet address' },
-        { status: 400, headers: corsHeaders }
-      );
+    if (!token) {
+      return redirectWithError('Missing token');
     }
 
-    if (!challenge || !signature) {
-      return NextResponse.json(
-        { error: 'Missing challenge or signature' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    // Find the challenge in database
-    const storedChallenge = await db.query.authChallenges.findFirst({
+    // Find the magic link in database
+    const storedLink = await db.query.magicLinks.findFirst({
       where: and(
-        eq(authChallenges.challenge, challenge),
-        eq(authChallenges.walletAddress, walletAddress),
-        isNull(authChallenges.usedAt),
-        gt(authChallenges.expiresAt, new Date())
+        eq(magicLinks.token, token),
+        isNull(magicLinks.usedAt),
+        gt(magicLinks.expiresAt, new Date())
       ),
     });
 
-    if (!storedChallenge) {
-      return NextResponse.json(
-        { error: 'Invalid, expired, or already used challenge' },
-        { status: 400, headers: corsHeaders }
-      );
+    if (!storedLink) {
+      return redirectWithError('Invalid, expired, or already used link');
     }
 
-    // Build the full message that was signed (same as what we sent to client)
-    const message = `Sign this message to authenticate with Stellar Snaps:\n\n${challenge}`;
-
-    // Verify signature
-    const isValid = verifySignature(walletAddress, message, signature);
-
-    if (!isValid) {
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
-    // Mark challenge as used
-    await db.update(authChallenges)
+    // Mark link as used
+    await db.update(magicLinks)
       .set({ usedAt: new Date() })
-      .where(eq(authChallenges.id, storedChallenge.id));
+      .where(eq(magicLinks.id, storedLink.id));
 
     // Find or create developer
     let developer = await db.query.developers.findFirst({
-      where: eq(developers.walletAddress, walletAddress),
+      where: eq(developers.email, storedLink.email),
     });
 
     if (!developer) {
       const newDeveloper = {
         id: generateId(),
-        walletAddress,
+        email: storedLink.email,
       };
       await db.insert(developers).values(newDeveloper);
       developer = await db.query.developers.findFirst({
@@ -96,10 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!developer) {
-      return NextResponse.json(
-        { error: 'Failed to create developer account' },
-        { status: 500, headers: corsHeaders }
-      );
+      return redirectWithError('Failed to create account');
     }
 
     // Generate new API key
@@ -113,23 +68,22 @@ export async function POST(request: NextRequest) {
       name: 'Default',
     });
 
-    return NextResponse.json(
-      {
-        developer: {
-          id: developer.id,
-          walletAddress: developer.walletAddress,
-          createdAt: developer.createdAt,
-        },
-        apiKey: key, // Only shown once!
-        message: 'Save this API key securely. It will not be shown again.',
-      },
-      { headers: corsHeaders }
-    );
+    // Redirect to API keys page with the new key
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://stellar-snaps.vercel.app';
+    const redirectUrl = new URL('/developers/hub/api-keys', baseUrl);
+    redirectUrl.searchParams.set('newKey', key);
+    redirectUrl.searchParams.set('email', storedLink.email);
+
+    return NextResponse.redirect(redirectUrl.toString());
   } catch (error) {
     console.error('[Auth] Verify error:', error);
-    return NextResponse.json(
-      { error: 'Authentication failed' },
-      { status: 500, headers: corsHeaders }
-    );
+    return redirectWithError('Authentication failed');
   }
+}
+
+function redirectWithError(message: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://stellar-snaps.vercel.app';
+  const redirectUrl = new URL('/developers/hub/api-keys', baseUrl);
+  redirectUrl.searchParams.set('error', message);
+  return NextResponse.redirect(redirectUrl.toString());
 }

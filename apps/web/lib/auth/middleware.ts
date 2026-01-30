@@ -7,7 +7,8 @@ import { hashApiKey } from './utils';
 export interface AuthenticatedRequest {
   developer: {
     id: string;
-    walletAddress: string;
+    email: string;
+    walletAddress?: string | null;
   };
   apiKey: {
     id: string;
@@ -94,6 +95,7 @@ export async function withApiKey(request: NextRequest): Promise<AuthResult> {
     auth: {
       developer: {
         id: developer.id,
+        email: developer.email,
         walletAddress: developer.walletAddress,
       },
       apiKey: {
