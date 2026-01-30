@@ -1,0 +1,362 @@
+/**
+ * Default CSS styles for @stellar-snaps/react components
+ * 
+ * Import this in your app: import '@stellar-snaps/react/styles.css'
+ * Or use your own styles with the headless components
+ */
+
+:root {
+  --snaps-primary: #6366f1;
+  --snaps-primary-hover: #4f46e5;
+  --snaps-bg: #ffffff;
+  --snaps-bg-secondary: #f5f5f5;
+  --snaps-text: #1a1a1a;
+  --snaps-text-secondary: #666666;
+  --snaps-border: #e5e5e5;
+  --snaps-success: #22c55e;
+  --snaps-error: #ef4444;
+  --snaps-warning: #f59e0b;
+  --snaps-radius: 8px;
+  --snaps-font: inherit;
+  --snaps-font-size: 14px;
+  --snaps-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --snaps-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark theme class */
+.snaps-dark {
+  --snaps-primary: #818cf8;
+  --snaps-primary-hover: #6366f1;
+  --snaps-bg: #1a1a1a;
+  --snaps-bg-secondary: #2a2a2a;
+  --snaps-text: #ffffff;
+  --snaps-text-secondary: #a0a0a0;
+  --snaps-border: #333333;
+  --snaps-success: #4ade80;
+  --snaps-error: #f87171;
+  --snaps-warning: #fbbf24;
+  --snaps-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --snaps-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Base button styles */
+.snaps-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: var(--snaps-font);
+  font-size: var(--snaps-font-size);
+  font-weight: 500;
+  border-radius: var(--snaps-radius);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.snaps-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Button variants */
+.snaps-btn-solid {
+  background: var(--snaps-primary);
+  color: white;
+}
+
+.snaps-btn-solid:hover:not(:disabled) {
+  background: var(--snaps-primary-hover);
+}
+
+.snaps-btn-outline {
+  background: transparent;
+  color: var(--snaps-primary);
+  border: 1px solid var(--snaps-primary);
+}
+
+.snaps-btn-outline:hover:not(:disabled) {
+  background: var(--snaps-primary);
+  color: white;
+}
+
+.snaps-btn-ghost {
+  background: transparent;
+  color: var(--snaps-text);
+}
+
+.snaps-btn-ghost:hover:not(:disabled) {
+  background: var(--snaps-bg-secondary);
+}
+
+/* Button sizes */
+.snaps-btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.snaps-btn-md {
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+.snaps-btn-lg {
+  padding: 14px 28px;
+  font-size: 16px;
+}
+
+/* Card styles */
+.snaps-card {
+  background: var(--snaps-bg);
+  border: 1px solid var(--snaps-border);
+  border-radius: var(--snaps-radius);
+  padding: 20px;
+  box-shadow: var(--snaps-shadow);
+  font-family: var(--snaps-font);
+}
+
+.snaps-card-header {
+  margin-bottom: 16px;
+}
+
+.snaps-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--snaps-text);
+  margin: 0 0 4px 0;
+}
+
+.snaps-card-description {
+  font-size: 14px;
+  color: var(--snaps-text-secondary);
+  margin: 0;
+}
+
+.snaps-card-amount {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--snaps-text);
+  margin: 16px 0;
+}
+
+.snaps-card-amount-asset {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--snaps-text-secondary);
+  margin-left: 4px;
+}
+
+.snaps-card-footer {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+/* Modal styles */
+.snaps-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: snaps-fade-in 0.15s ease;
+}
+
+.snaps-modal {
+  background: var(--snaps-bg);
+  border-radius: var(--snaps-radius);
+  box-shadow: var(--snaps-shadow-lg);
+  max-width: 400px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: snaps-slide-up 0.2s ease;
+}
+
+.snaps-modal-header {
+  padding: 20px 20px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.snaps-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--snaps-text);
+  margin: 0;
+}
+
+.snaps-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--snaps-text-secondary);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.snaps-modal-close:hover {
+  color: var(--snaps-text);
+}
+
+.snaps-modal-body {
+  padding: 20px;
+}
+
+.snaps-modal-footer {
+  padding: 0 20px 20px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Connect button styles */
+.snaps-connect {
+  position: relative;
+}
+
+.snaps-connect-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--snaps-bg);
+  border: 1px solid var(--snaps-border);
+  border-radius: var(--snaps-radius);
+  box-shadow: var(--snaps-shadow-lg);
+  min-width: 180px;
+  z-index: 100;
+  animation: snaps-fade-in 0.1s ease;
+}
+
+.snaps-connect-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--snaps-text);
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.snaps-connect-dropdown-item:hover {
+  background: var(--snaps-bg-secondary);
+}
+
+.snaps-connect-dropdown-divider {
+  height: 1px;
+  background: var(--snaps-border);
+  margin: 4px 0;
+}
+
+/* Status badges */
+.snaps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.snaps-badge-success {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--snaps-success);
+}
+
+.snaps-badge-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--snaps-error);
+}
+
+.snaps-badge-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--snaps-warning);
+}
+
+.snaps-badge-pending {
+  background: var(--snaps-bg-secondary);
+  color: var(--snaps-text-secondary);
+}
+
+/* Spinner */
+.snaps-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: snaps-spin 0.75s linear infinite;
+}
+
+/* Animations */
+@keyframes snaps-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes snaps-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes snaps-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Transaction status */
+.snaps-tx-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--snaps-radius);
+  font-size: 14px;
+}
+
+.snaps-tx-status-pending {
+  background: var(--snaps-bg-secondary);
+  color: var(--snaps-text-secondary);
+}
+
+.snaps-tx-status-success {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--snaps-success);
+}
+
+.snaps-tx-status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--snaps-error);
+}
+
+.snaps-tx-link {
+  color: var(--snaps-primary);
+  text-decoration: none;
+}
+
+.snaps-tx-link:hover {
+  text-decoration: underline;
+}
