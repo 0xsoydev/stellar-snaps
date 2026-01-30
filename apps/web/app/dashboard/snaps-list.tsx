@@ -13,24 +13,31 @@ type Snap = {
 
 type Props = {
   creator: string;
+  sessionToken?: string;
   refreshKey: number;
 };
 
-export default function SnapsList({ creator, refreshKey }: Props) {
+export default function SnapsList({ creator, sessionToken, refreshKey }: Props) {
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchSnaps();
-  }, [creator, refreshKey]);
+  }, [creator, sessionToken, refreshKey]);
 
   const fetchSnaps = async () => {
+    if (!sessionToken) return;
+    
     setLoading(true);
     try {
-      const res = await fetch(`/api/snaps?creator=${encodeURIComponent(creator)}`);
+      const res = await fetch('/api/snaps', {
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
-        setSnaps(data);
+        setSnaps(data.snaps || []);
       }
     } catch (err) {
       console.error('Failed to fetch snaps:', err);
@@ -40,10 +47,14 @@ export default function SnapsList({ creator, refreshKey }: Props) {
 
   const deleteSnap = async (id: string) => {
     if (!confirm('Delete this snap?')) return;
+    if (!sessionToken) return;
 
     try {
-      const res = await fetch(`/api/snaps?id=${id}&creator=${encodeURIComponent(creator)}`, {
+      const res = await fetch(`/api/snaps?id=${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`,
+        },
       });
       if (res.ok) {
         setSnaps(snaps.filter((s) => s.id !== id));

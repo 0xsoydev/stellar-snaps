@@ -3,12 +3,12 @@ import { db } from '@/lib/db';
 import { snaps } from '@/lib/db/schema';
 import { nanoid } from 'nanoid';
 import { eq, and } from 'drizzle-orm';
-import { withApiKey, authError } from '@/lib/auth/middleware';
+import { withFlexibleAuth, authError } from '@/lib/auth/middleware';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
+  'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, Authorization',
 };
 
 export async function OPTIONS() {
@@ -18,11 +18,11 @@ export async function OPTIONS() {
 /**
  * GET /api/snaps
  * 
- * List all snaps created by the authenticated developer.
- * Requires X-API-Key header.
+ * List all snaps created by the authenticated user.
+ * Accepts X-API-Key or Authorization: Bearer <session_token>
  */
 export async function GET(request: NextRequest) {
-  const auth = await withApiKey(request);
+  const auth = await withFlexibleAuth(request);
   if (!auth.success) {
     return authError(auth.error, auth.status);
   }
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const results = await db
     .select()
     .from(snaps)
-    .where(eq(snaps.creator, auth.auth.developer.id))
+    .where(eq(snaps.creator, auth.walletAddress))
     .orderBy(snaps.createdAt);
 
   return NextResponse.json({ snaps: results }, { headers: corsHeaders });
@@ -39,13 +39,13 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/snaps
  * 
- * Create a new snap. Creator is set to the authenticated developer's wallet.
- * Requires X-API-Key header.
+ * Create a new snap. Creator is set to the authenticated user's wallet address.
+ * Accepts X-API-Key or Authorization: Bearer <session_token>
  * 
  * Body: { title, description?, destination, amount?, assetCode?, assetIssuer?, memo?, memoType?, network?, imageUrl? }
  */
 export async function POST(request: NextRequest) {
-  const auth = await withApiKey(request);
+  const auth = await withFlexibleAuth(request);
   if (!auth.success) {
     return authError(auth.error, auth.status);
   }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     const [newSnap] = await db.insert(snaps).values({
       id,
-      creator: auth.auth.developer.id,
+      creator: auth.walletAddress,
       title,
       description: description || null,
       destination,
@@ -100,10 +100,10 @@ export async function POST(request: NextRequest) {
  * DELETE /api/snaps?id=xxx
  * 
  * Delete a snap. Only the creator can delete their own snaps.
- * Requires X-API-Key header.
+ * Accepts X-API-Key or Authorization: Bearer <session_token>
  */
 export async function DELETE(request: NextRequest) {
-  const auth = await withApiKey(request);
+  const auth = await withFlexibleAuth(request);
   if (!auth.success) {
     return authError(auth.error, auth.status);
   }
@@ -123,7 +123,7 @@ export async function DELETE(request: NextRequest) {
     .from(snaps)
     .where(and(
       eq(snaps.id, id),
-      eq(snaps.creator, auth.auth.developer.id)
+      eq(snaps.creator, auth.walletAddress)
     ));
 
   if (!snap) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiKeys, developers } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { apiKeys, developers, walletSessions } from '@/lib/db/schema';
+import { eq, and, isNull, gt } from 'drizzle-orm';
 import { hashApiKey } from './utils';
 
 export interface AuthenticatedRequest {
@@ -16,8 +16,20 @@ export interface AuthenticatedRequest {
   };
 }
 
+export interface WalletAuthenticatedRequest {
+  walletAddress: string;
+}
+
 export type AuthResult = 
   | { success: true; auth: AuthenticatedRequest }
+  | { success: false; error: string; status: number };
+
+export type WalletAuthResult =
+  | { success: true; auth: WalletAuthenticatedRequest }
+  | { success: false; error: string; status: number };
+
+export type FlexibleAuthResult =
+  | { success: true; walletAddress: string; type: 'wallet' | 'apikey' }
   | { success: false; error: string; status: number };
 
 /**
@@ -117,8 +129,106 @@ export function authError(error: string, status: number): NextResponse {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
+        'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, Authorization',
       },
     }
   );
+}
+
+/**
+ * Validate a wallet session token from request headers
+ * Expects: Authorization: Bearer <token>
+ */
+export async function withWalletSession(request: NextRequest): Promise<WalletAuthResult> {
+  const authHeader = request.headers.get('Authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return {
+      success: false,
+      error: 'Missing or invalid Authorization header',
+      status: 401,
+    };
+  }
+
+  const token = authHeader.slice(7); // Remove "Bearer "
+
+  // Find valid session
+  const [session] = await db
+    .select()
+    .from(walletSessions)
+    .where(
+      and(
+        eq(walletSessions.token, token),
+        gt(walletSessions.expiresAt, new Date())
+      )
+    )
+    .limit(1);
+
+  if (!session) {
+    return {
+      success: false,
+      error: 'Invalid or expired session',
+      status: 401,
+    };
+  }
+
+  return {
+    success: true,
+    auth: {
+      walletAddress: session.walletAddress,
+    },
+  };
+}
+
+/**
+ * Flexible auth that accepts either:
+ * - X-API-Key header (for SDK/developer use)
+ * - Authorization: Bearer <token> (for dashboard/wallet users)
+ * 
+ * Returns the wallet address in both cases for consistent access control
+ */
+export async function withFlexibleAuth(request: NextRequest): Promise<FlexibleAuthResult> {
+  const apiKeyHeader = request.headers.get('X-API-Key');
+  const authHeader = request.headers.get('Authorization');
+
+  // Try API key first
+  if (apiKeyHeader) {
+    const result = await withApiKey(request);
+    if (result.success) {
+      // Use the developer's wallet address if set, otherwise use email as identifier
+      const walletAddress = result.auth.developer.walletAddress;
+      if (!walletAddress) {
+        return {
+          success: false,
+          error: 'Developer account has no wallet address linked',
+          status: 400,
+        };
+      }
+      return {
+        success: true,
+        walletAddress,
+        type: 'apikey',
+      };
+    }
+    return result;
+  }
+
+  // Try wallet session
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const result = await withWalletSession(request);
+    if (result.success) {
+      return {
+        success: true,
+        walletAddress: result.auth.walletAddress,
+        type: 'wallet',
+      };
+    }
+    return result;
+  }
+
+  return {
+    success: false,
+    error: 'Missing authentication. Provide X-API-Key or Authorization header.',
+    status: 401,
+  };
 }

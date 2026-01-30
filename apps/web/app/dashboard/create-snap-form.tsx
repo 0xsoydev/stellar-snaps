@@ -4,10 +4,11 @@ import { useState } from 'react';
 
 type Props = {
   creator: string;
+  sessionToken?: string;
   onCreated: () => void;
 };
 
-export default function CreateSnapForm({ creator, onCreated }: Props) {
+export default function CreateSnapForm({ creator, sessionToken, onCreated }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<string | null>(null);
@@ -19,6 +20,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
     amount: '',
     assetCode: 'XLM',
     memo: '',
+    network: 'testnet' as 'testnet' | 'public',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,9 +30,16 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
     setSuccess(null);
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (sessionToken) {
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+      }
+
       const res = await fetch('/api/snaps', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           creator,
           title: form.title,
@@ -39,7 +48,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
           amount: form.amount || undefined,
           assetCode: form.assetCode,
           memo: form.memo || undefined,
-          network: 'testnet',
+          network: form.network,
         }),
       });
 
@@ -48,8 +57,8 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
         throw new Error(data.error || 'Failed to create snap');
       }
 
-      const snap = await res.json();
-      const url = `${window.location.origin}/s/${snap.id}`;
+      const data = await res.json();
+      const url = `${window.location.origin}/s/${data.snap.id}`;
       setSuccess(url);
 
       // Reset form
@@ -60,6 +69,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
         amount: '',
         assetCode: 'XLM',
         memo: '',
+        network: 'testnet',
       });
 
       onCreated();
@@ -157,7 +167,7 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
       </div>
 
       {/* Memo */}
-      <div className="mb-8">
+      <div className="mb-6">
         <label className="text-[#b5b4b6] text-sm font-medium mb-2 block">Memo</label>
         <input
           type="text"
@@ -166,6 +176,40 @@ export default function CreateSnapForm({ creator, onCreated }: Props) {
           placeholder="Optional memo"
           className={inputClass}
         />
+      </div>
+
+      {/* Network */}
+      <div className="mb-8">
+        <label className="text-[#b5b4b6] text-sm font-medium mb-2 block">Network</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, network: 'testnet' })}
+            className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors border ${
+              form.network === 'testnet'
+                ? 'bg-[#525152] border-[#6b6a6c] text-[#e8e7e9]'
+                : 'bg-[#3e3d3f] border-[#4e4d4f] text-[#8a898b] hover:text-[#b5b4b6]'
+            }`}
+          >
+            Testnet
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, network: 'public' })}
+            className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors border ${
+              form.network === 'public'
+                ? 'bg-[#525152] border-[#6b6a6c] text-[#e8e7e9]'
+                : 'bg-[#3e3d3f] border-[#4e4d4f] text-[#8a898b] hover:text-[#b5b4b6]'
+            }`}
+          >
+            Mainnet
+          </button>
+        </div>
+        {form.network === 'public' && (
+          <p className="text-amber-400 text-xs mt-2">
+            Warning: Mainnet transactions use real XLM. Make sure your destination address is correct.
+          </p>
+        )}
       </div>
 
       {/* Error */}

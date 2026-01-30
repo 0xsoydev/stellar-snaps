@@ -104,3 +104,30 @@ export const magicLinks = pgTable('magic_links', {
 
 export type MagicLink = typeof magicLinks.$inferSelect;
 export type NewMagicLink = typeof magicLinks.$inferInsert;
+
+// ============ WALLET SESSIONS TABLE ============
+
+export const walletSessions = pgTable('wallet_sessions', {
+  id: text('id').primaryKey(),
+  walletAddress: text('wallet_address').notNull(),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export type WalletSession = typeof walletSessions.$inferSelect;
+export type NewWalletSession = typeof walletSessions.$inferInsert;
+
+// ============ WALLET CHALLENGES TABLE ============
+
+export const walletChallenges = pgTable('wallet_challenges', {
+  id: text('id').primaryKey(),
+  walletAddress: text('wallet_address').notNull(),
+  challenge: text('challenge').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export type WalletChallenge = typeof walletChallenges.$inferSelect;
+export type NewWalletChallenge = typeof walletChallenges.$inferInsert;
