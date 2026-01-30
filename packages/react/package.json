@@ -28,7 +28,8 @@
     "react-dom": ">=17.0.0"
   },
   "dependencies": {
-    "@stellar-snaps/core": "workspace:*"
+    "@stellar-snaps/core": "workspace:*",
+    "@stellar/freighter-api": "^6.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",

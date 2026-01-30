@@ -187,6 +187,9 @@ importers:
       '@stellar-snaps/core':
         specifier: workspace:*
         version: link:../core
+      '@stellar/freighter-api':
+        specifier: ^6.0.1
+        version: 6.0.1
     devDependencies:
       '@types/react':
         specifier: ^18.3.0

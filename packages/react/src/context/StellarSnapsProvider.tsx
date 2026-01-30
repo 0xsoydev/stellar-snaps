@@ -3,6 +3,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import * as freighterApi from '@stellar/freighter-api';
 import type { Network } from '@stellar-snaps/core';
 import { Theme, lightTheme, darkTheme, ThemeName, themeToCssVars } from '../themes';
 
@@ -84,28 +85,54 @@ export function StellarSnapsProvider({
   // Freighter availability
   const [freighterAvailable, setFreighterAvailable] = useState(false);
   
-  // Check for Freighter on mount
+  // Check for Freighter on mount using official API
   useEffect(() => {
-    const checkFreighter = () => {
-      const available = typeof window !== 'undefined' && 
-        // @ts-expect-error - Freighter types
-        (!!window.freighter || !!window.freighterApi);
-      setFreighterAvailable(available);
+    let mounted = true;
+    
+    const checkFreighter = async () => {
+      try {
+        const result = await freighterApi.isConnected();
+        if (mounted) {
+          setFreighterAvailable(true);
+          
+          // If already connected, get the address
+          if (result.isConnected) {
+            try {
+              const { address } = await freighterApi.getAddress();
+              if (mounted && address) {
+                setWallet({
+                  address,
+                  connected: true,
+                  connecting: false,
+                });
+              }
+            } catch (e) {
+              // Not allowed yet
+            }
+          }
+        }
+      } catch (err) {
+        if (mounted) {
+          setFreighterAvailable(false);
+        }
+      }
     };
     
     checkFreighter();
-    
-    // Check again after a short delay (Freighter may inject later)
     const timeout = setTimeout(checkFreighter, 1000);
-    return () => clearTimeout(timeout);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+    };
   }, []);
   
   // Auto-connect if enabled
   useEffect(() => {
-    if (autoConnect && freighterAvailable) {
+    if (autoConnect && freighterAvailable && !wallet.connected) {
       connect();
     }
-  }, [autoConnect, freighterAvailable]);
+  }, [autoConnect, freighterAvailable, wallet.connected]);
   
   // Connect to Freighter
   const connect = useCallback(async (): Promise<string | null> => {
@@ -117,17 +144,23 @@ export function StellarSnapsProvider({
     setWallet(prev => ({ ...prev, connecting: true }));
     
     try {
-      // @ts-expect-error - Freighter types
-      const freighter = window.freighter || window.freighterApi;
-      const publicKey = await freighter.getPublicKey();
+      // Request permission
+      await freighterApi.setAllowed();
       
-      setWallet({
-        address: publicKey,
-        connected: true,
-        connecting: false,
-      });
+      // Get address
+      const { address } = await freighterApi.getAddress();
       
-      return publicKey;
+      if (address) {
+        setWallet({
+          address,
+          connected: true,
+          connecting: false,
+        });
+        return address;
+      }
+      
+      setWallet(prev => ({ ...prev, connecting: false }));
+      return null;
     } catch (error) {
       console.error('[StellarSnaps] Failed to connect:', error);
       setWallet(prev => ({ ...prev, connecting: false }));

@@ -1,10 +1,11 @@
 /**
  * useFreighter - Hook for Freighter wallet integration
  * 
- * Can be used standalone or with StellarSnapsProvider
+ * Uses @stellar/freighter-api for proper Freighter detection and interaction
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import * as freighterApi from '@stellar/freighter-api';
 import type { Network } from '@stellar-snaps/core';
 import { useStellarSnapsOptional } from '../context/StellarSnapsProvider';
 
@@ -51,18 +52,48 @@ export function useFreighter(options: UseFreighterOptions = {}): UseFreighterRes
   const isConnecting = context?.wallet.connecting ?? connecting;
   const network = optNetwork ?? context?.network ?? 'testnet';
   
-  // Check Freighter installation
+  // Check Freighter installation using the official API
   useEffect(() => {
-    const check = () => {
-      const installed = typeof window !== 'undefined' && 
-        // @ts-expect-error - Freighter types
-        (!!window.freighter || !!window.freighterApi);
-      setIsInstalled(installed);
+    let mounted = true;
+    
+    const checkFreighter = async () => {
+      try {
+        // Use the official isConnected check - it will fail if Freighter isn't installed
+        const result = await freighterApi.isConnected();
+        if (mounted) {
+          // If we get here, Freighter is installed
+          setIsInstalled(true);
+          
+          // If already connected, get the address
+          if (result.isConnected) {
+            try {
+              const { address } = await freighterApi.getAddress();
+              if (mounted && address) {
+                setLocalWallet(address);
+              }
+            } catch (e) {
+              // Not allowed yet, that's fine
+            }
+          }
+        }
+      } catch (err) {
+        // Freighter not installed
+        if (mounted) {
+          setIsInstalled(false);
+        }
+      }
     };
     
-    check();
-    const timeout = setTimeout(check, 1000);
-    return () => clearTimeout(timeout);
+    // Check immediately
+    checkFreighter();
+    
+    // Also check after a delay (Freighter may inject later)
+    const timeout = setTimeout(checkFreighter, 1000);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+    };
   }, []);
   
   // Auto-connect
@@ -70,7 +101,7 @@ export function useFreighter(options: UseFreighterOptions = {}): UseFreighterRes
     if (autoConnect && isInstalled && !connected) {
       connect();
     }
-  }, [autoConnect, isInstalled]);
+  }, [autoConnect, isInstalled, connected]);
   
   // Connect function
   const connect = useCallback(async (): Promise<string | null> => {
@@ -80,20 +111,27 @@ export function useFreighter(options: UseFreighterOptions = {}): UseFreighterRes
     }
     
     if (!isInstalled) {
-      console.warn('[useFreighter] Freighter is not installed');
+      console.warn('[StellarSnaps] Freighter is not installed');
       return null;
     }
     
     setConnecting(true);
     
     try {
-      // @ts-expect-error - Freighter types
-      const freighter = window.freighter || window.freighterApi;
-      const publicKey = await freighter.getPublicKey();
-      setLocalWallet(publicKey);
-      return publicKey;
+      // Request access permission
+      await freighterApi.setAllowed();
+      
+      // Get the public key
+      const { address } = await freighterApi.getAddress();
+      
+      if (address) {
+        setLocalWallet(address);
+        return address;
+      }
+      
+      return null;
     } catch (error) {
-      console.error('[useFreighter] Failed to connect:', error);
+      console.error('[StellarSnaps] Failed to connect:', error);
       return null;
     } finally {
       setConnecting(false);
@@ -120,15 +158,13 @@ export function useFreighter(options: UseFreighterOptions = {}): UseFreighterRes
       throw new Error('Freighter is not installed');
     }
     
-    // @ts-expect-error - Freighter types
-    const freighter = window.freighter || window.freighterApi;
-    
     const networkPassphrase = getNetworkPassphrase(targetNetwork);
-    const signedXdr = await freighter.signTransaction(xdr, {
+    
+    const { signedTxXdr } = await freighterApi.signTransaction(xdr, {
       networkPassphrase,
     });
     
-    return signedXdr;
+    return signedTxXdr;
   }, [isInstalled, network]);
   
   // Get network passphrase
