@@ -1,42 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '../../../lib/db';
-import { snaps } from '../../../lib/db/schema';
+import { db } from '@/lib/db';
+import { snaps } from '@/lib/db/schema';
 import { nanoid } from 'nanoid';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { withApiKey, authError } from '@/lib/auth/middleware';
 
-// GET /api/snaps - list snaps for a creator
-export async function GET(request: NextRequest) {
-  const creator = request.nextUrl.searchParams.get('creator');
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
+};
 
-  if (!creator) {
-    return NextResponse.json({ error: 'creator param required' }, { status: 400 });
-  }
-
-  const results = await db.select().from(snaps).where(eq(snaps.creator, creator));
-  return NextResponse.json(results);
+export async function OPTIONS() {
+  return new NextResponse(null, { headers: corsHeaders });
 }
 
-// POST /api/snaps - create a new snap
+/**
+ * GET /api/snaps
+ * 
+ * List all snaps created by the authenticated developer.
+ * Requires X-API-Key header.
+ */
+export async function GET(request: NextRequest) {
+  const auth = await withApiKey(request);
+  if (!auth.success) {
+    return authError(auth.error, auth.status);
+  }
+
+  const results = await db
+    .select()
+    .from(snaps)
+    .where(eq(snaps.creator, auth.auth.developer.walletAddress))
+    .orderBy(snaps.createdAt);
+
+  return NextResponse.json({ snaps: results }, { headers: corsHeaders });
+}
+
+/**
+ * POST /api/snaps
+ * 
+ * Create a new snap. Creator is set to the authenticated developer's wallet.
+ * Requires X-API-Key header.
+ * 
+ * Body: { title, description?, destination, amount?, assetCode?, assetIssuer?, memo?, memoType?, network?, imageUrl? }
+ */
 export async function POST(request: NextRequest) {
+  const auth = await withApiKey(request);
+  if (!auth.success) {
+    return authError(auth.error, auth.status);
+  }
+
   try {
     const body = await request.json();
+    const { title, description, destination, amount, assetCode, assetIssuer, memo, memoType, network, imageUrl } = body;
 
-    const { creator, title, description, destination, amount, assetCode, assetIssuer, memo, memoType, network, imageUrl } = body;
-
-    if (!creator || !title || !destination) {
-      return NextResponse.json({ error: 'creator, title, and destination are required' }, { status: 400 });
+    if (!title || !destination) {
+      return NextResponse.json(
+        { error: 'title and destination are required' },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // Validate destination
     if (destination.length !== 56 || !destination.startsWith('G')) {
-      return NextResponse.json({ error: 'Invalid Stellar destination address' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid Stellar destination address' },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     const id = nanoid(8);
 
     const [newSnap] = await db.insert(snaps).values({
       id,
-      creator,
+      creator: auth.auth.developer.walletAddress,
       title,
       description: description || null,
       destination,
@@ -49,35 +86,57 @@ export async function POST(request: NextRequest) {
       imageUrl: imageUrl || null,
     }).returning();
 
-    return NextResponse.json(newSnap, { status: 201 });
+    return NextResponse.json({ snap: newSnap }, { status: 201, headers: corsHeaders });
   } catch (error) {
     console.error('Error creating snap:', error);
-    return NextResponse.json({ error: 'Failed to create snap' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to create snap' },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }
 
-// DELETE /api/snaps - delete a snap
+/**
+ * DELETE /api/snaps?id=xxx
+ * 
+ * Delete a snap. Only the creator can delete their own snaps.
+ * Requires X-API-Key header.
+ */
 export async function DELETE(request: NextRequest) {
-  const id = request.nextUrl.searchParams.get('id');
-  const creator = request.nextUrl.searchParams.get('creator');
-
-  if (!id || !creator) {
-    return NextResponse.json({ error: 'id and creator params required' }, { status: 400 });
+  const auth = await withApiKey(request);
+  if (!auth.success) {
+    return authError(auth.error, auth.status);
   }
 
-  // First check ownership
-  const [snap] = await db.select().from(snaps).where(eq(snaps.id, id));
+  const id = request.nextUrl.searchParams.get('id');
+
+  if (!id) {
+    return NextResponse.json(
+      { error: 'id param required' },
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  // Find the snap and verify ownership
+  const [snap] = await db
+    .select()
+    .from(snaps)
+    .where(and(
+      eq(snaps.id, id),
+      eq(snaps.creator, auth.auth.developer.walletAddress)
+    ));
 
   if (!snap) {
-    return NextResponse.json({ error: 'Snap not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Snap not found or not owned by you' },
+      { status: 404, headers: corsHeaders }
+    );
   }
 
-  if (snap.creator !== creator) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-  }
-
-  // Now delete
   await db.delete(snaps).where(eq(snaps.id, id));
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json(
+    { success: true, message: 'Snap deleted' },
+    { headers: corsHeaders }
+  );
 }
