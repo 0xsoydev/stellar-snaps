@@ -5,19 +5,33 @@ import { useEffect, useState } from 'react';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
+      
+      // Check if footer is in view
+      const footer = document.getElementById('main-footer');
+      if (footer) {
+        const footerRect = footer.getBoundingClientRect();
+        // Hide navbar when footer top is at or above the viewport top + 100px
+        setHidden(footerRect.top <= 100);
+      }
     };
-    window.addEventListener('scroll', handleScroll);
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
     <nav 
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-black/50 backdrop-blur-md border-b border-[#fe330a]/10 py-4' : 'bg-transparent py-6'
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        hidden 
+          ? 'opacity-0 -translate-y-full pointer-events-none' 
+          : scrolled 
+            ? 'bg-black/50 backdrop-blur-md border-b border-[#fe330a]/10 py-4 opacity-100' 
+            : 'bg-transparent py-6 opacity-100'
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">

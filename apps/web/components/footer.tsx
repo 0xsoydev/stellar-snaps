@@ -31,7 +31,10 @@ export default function Footer() {
   }, []);
 
   return (
-    <footer className="relative bg-black text-white overflow-hidden -mt-8 pt-8 pb-12">
+    <footer 
+      id="main-footer"
+      className="relative bg-black text-white overflow-hidden min-h-screen flex flex-col"
+    >
       {/* Moving Gradient Background Effect with Parallax */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         {/* Main orange/red blob - Parallax layer 1 (slowest) */}
@@ -59,7 +62,7 @@ export default function Footer() {
         />
       </div>
 
-      <div className="relative z-10 px-6 sm:px-12 pt-20 sm:pt-32 pb-8 flex flex-col justify-between min-h-[600px] sm:min-h-[800px]">
+      <div className="relative z-10 px-6 sm:px-12 pt-20 sm:pt-32 pb-8 flex flex-col justify-between flex-1">
         {/* Top Section */}
         <div className="flex flex-col md:flex-row justify-between items-start gap-12 md:gap-0">
           {/* Navigation - Left */}
