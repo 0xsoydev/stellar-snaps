@@ -73,7 +73,7 @@ export default function Hero() {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <a href="/app" className="px-8 py-3.5 bg-[#fe330a] hover:bg-[#d92b08] text-white text-[15px] font-medium transition-all shadow-[0_4px_20px_rgba(254,51,10,0.3)] hover:shadow-[0_6px_25px_rgba(254,51,10,0.4)] min-w-[140px] text-center">
+          <a href="/dashboard" className="px-8 py-3.5 bg-[#fe330a] hover:bg-[#d92b08] text-white text-[15px] font-medium transition-all shadow-[0_4px_20px_rgba(254,51,10,0.3)] hover:shadow-[0_6px_25px_rgba(254,51,10,0.4)] min-w-[140px] text-center">
             Launch App
           </a>
           <a href="#create-snap-demo" className="px-8 py-3.5 border border-white/10 bg-white/[0.02] backdrop-blur-sm text-white text-[15px] font-medium transition-all hover:bg-white/[0.05] min-w-[140px] text-center">
